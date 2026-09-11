@@ -325,13 +325,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [pracas]);
 
   // ============================================================================
-  // SUPABASE REALTIME (ATUALIZAÇÕES INTELIGENTES)
+  // SUPABASE REALTIME & SINCRONIZAÇÃO EM NUVEM
   // Escuta alterações em corridas, mototaxistas e praças sem sobrecarga de rede
   // ============================================================================
   useEffect(() => {
     setIsSupabaseActive(isSupabaseConfigured());
     const supabase = getSupabase();
     if (!supabase) return;
+
+    // 1. Carga inicial rápida do banco Supabase se disponível
+    const carregarDadosSupabase = async () => {
+      try {
+        const { data: corridasDb, error: errCorridas } = await supabase
+          .from('corridas')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (!errCorridas && corridasDb && corridasDb.length > 0) {
+          setDeliveries(corridasDb as any);
+        }
+
+        const { data: pracasDb, error: errPracas } = await supabase
+          .from('pracas')
+          .select('*');
+
+        if (!errPracas && pracasDb && pracasDb.length > 0) {
+          setPracas(pracasDb as any);
+        }
+      } catch (e) {
+        console.warn('Sincronização inicial com Supabase:', e);
+      }
+    };
+
+    carregarDadosSupabase();
 
     const channel = supabase
       .channel('nexo-realtime-canal')
@@ -852,6 +879,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setDeliveries((prev) => [newDelivery, ...prev]);
 
+    // Persistência assíncrona no Supabase
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        supabase
+          .from('corridas')
+          .insert([
+            {
+              id: newDelivery.id,
+              codigo_corrida: newDelivery.code,
+              passageiro_id: newDelivery.merchantId,
+              passageiro_nome: newDelivery.merchantName,
+              passageiro_telefone: newDelivery.merchantPhone,
+              pickup_address: newDelivery.pickupAddress,
+              delivery_address: newDelivery.deliveryAddress,
+              origem_latitude: newDelivery.origem_latitude,
+              origem_longitude: newDelivery.origem_longitude,
+              destino_latitude: newDelivery.destino_latitude,
+              destino_longitude: newDelivery.destino_longitude,
+              fee: newDelivery.deliveryFee,
+              status: newDelivery.status,
+              pin_code: newDelivery.pinCode,
+              notes: newDelivery.notes || newDelivery.observations,
+              created_at: newDelivery.createdAt,
+            },
+          ])
+          .then(({ error }) => {
+            if (error) console.warn('Aviso Supabase ao salvar corrida:', error);
+          });
+      }
+    } catch (e) {
+      console.warn('Erro ao disparar gravação no Supabase:', e);
+    }
+
     logAudit({
       category: 'entrega',
       actorId: merchant.id,
@@ -971,6 +1032,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       })
     );
+
+    // Atualiza status do motorista e da corrida no Supabase
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        supabase
+          .from('corridas')
+          .update({
+            mototaxista_id: courier.id,
+            mototaxista_nome: courier.name,
+            mototaxista_telefone: courier.phone,
+            current_courier_lat: courierInitLat,
+            current_courier_lng: courierInitLng,
+            status: 'entregador_aceitou',
+            updated_at: now,
+          })
+          .eq('id', deliveryId)
+          .then(() => {});
+      }
+    } catch (err) {
+      console.warn('Sync aceitar corrida Supabase:', err);
+    }
 
     logAudit({
       category: 'entrega',
@@ -1099,6 +1182,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       })
     );
+
+    // Sincroniza avanço de status no Supabase
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        supabase
+          .from('corridas')
+          .update({
+            status: nextStatus,
+            updated_at: now,
+          })
+          .eq('id', deliveryId)
+          .then(() => {});
+      }
+    } catch (err) {
+      console.warn('Sync status Supabase:', err);
+    }
 
     playChime();
     return { success: true };
@@ -1328,6 +1428,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       })
     );
+
+    // Persistência inteligente do GPS a cada 15s no Supabase
+    throttleAction(`gps_sync_${deliveryId}`, 14000, () => {
+      try {
+        const supabase = getSupabase();
+        if (supabase) {
+          supabase
+            .from('corridas')
+            .update({
+              current_courier_lat: telemetria.courierLat,
+              current_courier_lng: telemetria.courierLng,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', deliveryId)
+            .then(() => {});
+        }
+      } catch (err) {
+        console.warn('Sync GPS Supabase:', err);
+      }
+    });
   };
 
   // 5. SOLICITAR RECARGA DE CRÉDITOS (Passageiro)

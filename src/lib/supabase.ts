@@ -1,9 +1,11 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Variáveis de ambiente públicas (Vite)
+// Variáveis de ambiente públicas (Vite) com fallback para o projeto Alagoinha conectado
 const metaEnv = (import.meta as any).env || {};
-const supabaseUrl = metaEnv.VITE_SUPABASE_URL;
-const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl =
+  metaEnv.VITE_SUPABASE_URL || 'https://mvucvhartsaejtxamqvr.supabase.co';
+const supabaseAnonKey =
+  metaEnv.VITE_SUPABASE_ANON_KEY || 'sb_publishable_o0UIBDO7vutlI8vadQ2qZQ_VqLIc31N';
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
