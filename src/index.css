@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* Base form controls legibility guarantee */
+input, select, textarea {
+  color: #0f172a;
+}
+
+/* HIGH CONTRAST FOR LIGHT/WHITE INPUTS (e.g. Modals and Light Panels) */
+input.bg-white,
+textarea.bg-white,
+select.bg-white,
+input[class*="bg-white"],
+textarea[class*="bg-white"],
+select[class*="bg-white"],
+.bg-white input,
+.bg-white textarea,
+.bg-white select,
+.bg-neutral-50 input,
+.bg-neutral-50 textarea,
+.bg-neutral-50 select,
+.light-input {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+input.bg-white::placeholder,
+textarea.bg-white::placeholder,
+input[class*="bg-white"]::placeholder,
+textarea[class*="bg-white"]::placeholder,
+.bg-white input::placeholder,
+.bg-white textarea::placeholder,
+.light-input::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  opacity: 1 !important;
+}
+
+/* Explicit styling for select options inside white backgrounds */
+select.bg-white option,
+.bg-white select option,
+.light-input option {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+}
+
+/* HIGH CONTRAST FOR DARK INPUTS (e.g. Admin Portal and Dark Panels) */
+input.bg-slate-950,
+input.bg-slate-900,
+input[class*="bg-slate-950"],
+input[class*="bg-slate-900"],
+textarea.bg-slate-950,
+textarea.bg-slate-900,
+select.bg-slate-950,
+select.bg-slate-900,
+.dark-input {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+input.bg-slate-950::placeholder,
+input.bg-slate-900::placeholder,
+input[class*="bg-slate-950"]::placeholder,
+input[class*="bg-slate-900"]::placeholder,
+.dark-input::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+}
+
+select.bg-slate-950 option,
+select.bg-slate-900 option,
+.dark-input option {
+  color: #f8fafc !important;
+  background-color: #0f172a !important;
+}

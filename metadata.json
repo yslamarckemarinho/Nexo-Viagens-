@@ -1,0 +1,6 @@
+{
+  "name": "Nexo Viagens",
+  "description": "Plataforma de viagens e mobilidade urbana para passageiros e motoristas em Alagoinha-PB, com pontos de referência, corridas pré-pagas via créditos da Central e repasses transparentes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
