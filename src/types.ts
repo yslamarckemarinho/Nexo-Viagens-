@@ -158,10 +158,15 @@ export interface Passageiro {
   cpf?: string;
   email?: string;
   endereco_frequente?: string;
+  foto_url?: string;
+  photoUrl?: string;
   saldo_creditos?: number;
   total_gasto?: number;
   total_corridas?: number;
   ativo?: boolean;
+  status_cadastro?: 'pendente' | 'confirmado' | 'rejeitado';
+  confirmedAt?: string;
+  confirmedBy?: string;
   login_usuario?: string;
   senha?: string;
   created_at?: string;
@@ -173,10 +178,14 @@ export interface Merchant extends Passageiro {
   phone: string;
   email?: string;
   address: string;
+  photoUrl?: string;
   creditBalance: number;
   totalSpent: number;
   totalDeliveries: number;
   active: boolean;
+  status_cadastro?: 'pendente' | 'confirmado' | 'rejeitado';
+  confirmedAt?: string;
+  confirmedBy?: string;
   pixKey?: string;
   loginUsername?: string;
   password?: string;
@@ -190,6 +199,7 @@ export interface Corrida {
   passageiro_id?: string;
   passageiro_nome?: string;
   passageiro_telefone?: string;
+  passageiro_foto?: string;
   
   mototaxista_id?: string;
   mototaxista_nome?: string;
@@ -255,6 +265,8 @@ export interface Delivery extends Corrida {
   merchantId: string;
   merchantName: string;
   merchantPhone: string;
+  merchantPhotoUrl?: string;
+  passengerPhotoUrl?: string;
   courierId?: string;
   courierName?: string;
   courierPhone?: string;
@@ -447,6 +459,7 @@ export interface MerchantRegisterInput {
   phone: string;
   email?: string;
   address?: string;
+  photoUrl?: string;
   pixKey?: string;
   loginUsername?: string;
   password?: string;

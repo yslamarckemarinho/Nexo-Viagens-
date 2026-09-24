@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useRef } from 'react';
 
 interface NexoLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   variant?: 'light' | 'dark' | 'color';
   showSubtitle?: boolean;
   citySubtitle?: boolean;
+  onSecretAdminTap?: () => void;
+  enableSecretTap?: boolean;
 }
 
 export const NexoLogo: React.FC<NexoLogoProps> = ({
@@ -12,7 +14,31 @@ export const NexoLogo: React.FC<NexoLogoProps> = ({
   variant = 'color',
   showSubtitle = true,
   citySubtitle = true,
+  onSecretAdminTap,
+  enableSecretTap = true,
 }) => {
+  const tapCountRef = useRef(0);
+  const lastTapTimeRef = useRef(0);
+
+  const handleLogoTap = () => {
+    if (!enableSecretTap) return;
+    const now = Date.now();
+    if (now - lastTapTimeRef.current < 900) {
+      tapCountRef.current += 1;
+    } else {
+      tapCountRef.current = 1;
+    }
+    lastTapTimeRef.current = now;
+
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0;
+      if (onSecretAdminTap) {
+        onSecretAdminTap();
+      }
+      window.dispatchEvent(new CustomEvent('nexo-secret-admin-trigger'));
+    }
+  };
+
   const iconSizes = {
     sm: 'w-7 h-7',
     md: 'w-10 h-10',
@@ -37,7 +63,12 @@ export const NexoLogo: React.FC<NexoLogoProps> = ({
   const isLight = variant === 'light';
 
   return (
-    <div className="flex items-center gap-2.5 select-none">
+    <div
+      onClick={handleLogoTap}
+      role="banner"
+      title="Nexo Viagens"
+      className="flex items-center gap-2.5 select-none cursor-pointer active:scale-95 transition-transform"
+    >
       {/* Dynamic Futuristic Nexo Emblem */}
       <div className={`relative flex items-center justify-center ${iconSizes[size]} shrink-0 rounded-2xl p-1.5 shadow-md overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-cyan-950 border border-cyan-500/30`}>
         {/* Glow effect */}

@@ -23,9 +23,22 @@ const MainLayout: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get('rastreio');
       if (code) setPublicTrackingCode(code);
+      if (params.get('central') === '1' || params.get('central') === 'true' || params.get('adm') === '1') {
+        setSelectedAuthPortal('admin');
+      }
     };
+    checkParams();
     window.addEventListener('popstate', checkParams);
-    return () => window.removeEventListener('popstate', checkParams);
+
+    const handleSecretAdmin = () => {
+      setSelectedAuthPortal('admin');
+    };
+    window.addEventListener('nexo-secret-admin-trigger', handleSecretAdmin);
+
+    return () => {
+      window.removeEventListener('popstate', checkParams);
+      window.removeEventListener('nexo-secret-admin-trigger', handleSecretAdmin);
+    };
   }, []);
 
   // Sugestão 1: Rastreio Público da Família (sem necessidade de login)

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { NexoLogo } from '../common/NexoLogo';
 import {
@@ -16,6 +16,10 @@ import {
   EyeOff,
   UserPlus,
   LogIn,
+  Camera,
+  Upload,
+  RefreshCw,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface MerchantAuthScreenProps {
@@ -25,8 +29,8 @@ interface MerchantAuthScreenProps {
 export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }) => {
   const { loginMerchant, cadastrarComercio, settings, merchants } = useApp();
 
-  // Mode: 'login' | 'register'
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
+  // Mode: 'register' | 'login'
+  const [authMode, setAuthMode] = useState<'register' | 'login'>('register');
 
   // Login form state
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -37,11 +41,61 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regAddress, setRegAddress] = useState('Centro');
+  const [regPhoto, setRegPhoto] = useState<string | null>(null);
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
-  const [regSuccess, setRegSuccess] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle Photo selection/upload with compression
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setRegError('Por favor selecione um arquivo de imagem válido (JPG ou PNG).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Redimensionar para tamanho leve (máximo 400x400 para carregar rápido em 3G/4G)
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setRegPhoto(dataUrl);
+          setRegError(null);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Bairros populares em Alagoinha para atalhos rápidos
   const popularNeighborhoods = [
@@ -72,7 +126,12 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setRegError(null);
-    setRegSuccess(null);
+
+    // Foto obrigatória para segurança do piloto e do passageiro
+    if (!regPhoto) {
+      setRegError('A foto do rosto do passageiro é obrigatória para segurança mútua da viagem.');
+      return;
+    }
 
     if (!regName.trim()) {
       setRegError('Por favor, informe seu Nome Completo.');
@@ -104,16 +163,17 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
       name: regName.trim(),
       phone: regPhone.trim(),
       address: regAddress.trim() || 'Centro, Alagoinha-PB',
+      photoUrl: regPhoto,
       password: regPassword.trim(),
       initialCredit: 0.0,
     });
 
     if (!result.success) {
-      setRegError(result.error || 'Não foi possível cadastrar seu perfil. Tente novamente.');
+      setRegError(result.error || 'Não foi possível cadastrar sua conta. Tente novamente.');
       return;
     }
 
-    setRegSuccess('Cadastro realizado com sucesso! Entrando no app...');
+    // Auto-login efetuado no AppContext com sucesso!
   };
 
   const formatPhone = (val: string) => {
@@ -123,10 +183,14 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   };
 
-  const whatsappPhone = settings.centralPhone.replace(/\D/g, '');
-  const whatsappUrl = `https://wa.me/55${whatsappPhone}?text=${encodeURIComponent(
-    'Olá! Preciso de ajuda com meu cadastro de passageiro na Nexo Viagens de Alagoinha-PB.'
+  const centralDigits = settings.centralPhone.replace(/\D/g, '');
+  const generalWhatsappUrl = `https://wa.me/55${centralDigits}?text=${encodeURIComponent(
+    'Olá Central Nexo Viagens! Preciso de ajuda com meu acesso de passageiro em Alagoinha-PB.'
   )}`;
+
+  const confirmedMerchants = merchants.filter(
+    (m) => m.status_cadastro === 'confirmado' || (m.active && m.status_cadastro !== 'pendente')
+  );
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-cyan-500 selection:text-slate-950">
@@ -158,12 +222,12 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
             </div>
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white">
-                {authMode === 'register' ? 'Criar Cadastro de Passageiro' : 'Acesso do Passageiro'}
+                {authMode === 'register' ? 'Criar Conta de Passageiro' : 'Acesso do Passageiro'}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
                 {authMode === 'register'
-                  ? 'Cadastre-se grátis para solicitar viagens em Alagoinha-PB'
-                  : 'Entre com seu telefone ou usuário para pedir viagens'}
+                  ? 'Cadastro rápido e seguro com foto facial para identificação'
+                  : 'Acesse sua conta para pedir viagens e gerenciar créditos'}
               </p>
             </div>
           </div>
@@ -185,7 +249,7 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
               }`}
             >
               <UserPlus className="w-4 h-4" />
-              <span>Novo Cadastro</span>
+              <span>Criar Conta Rápida</span>
             </button>
             <button
               id="tab-passageiro-login"
@@ -206,7 +270,7 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
             </button>
           </div>
 
-          {/* 1. ABA DE CADASTRO DO PRÓPRIO PASSAGEIRO */}
+          {/* 1. ABA DE CADASTRO DO PASSAGEIRO COM FOTO OBRIGATÓRIA */}
           {authMode === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
               {regError && (
@@ -216,12 +280,74 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                 </div>
               )}
 
-              {regSuccess && (
-                <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
-                  <span>{regSuccess}</span>
+              {/* FOTO FACIAL OBRIGATÓRIA - DESTAQUE VISUAL */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-cyan-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-cyan-400" />
+                      <span>Sua Foto de Perfil</span>
+                      <span className="text-cyan-400 font-bold">* (Obrigatória)</span>
+                    </label>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Para segurança mútua, o mototaxista verá sua foto ao aceitar a corrida.
+                    </p>
+                  </div>
                 </div>
-              )}
+
+                {/* Upload / Preview Card */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handlePhotoUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                {regPhoto ? (
+                  <div className="flex items-center gap-4 bg-slate-900/90 p-3 rounded-xl border border-emerald-500/40">
+                    <img
+                      src={regPhoto}
+                      alt="Foto do passageiro"
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-400 shadow-md"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        Foto Carregada com Sucesso!
+                      </span>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        Sua foto já está pronta para identificação dos pilotos.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="mt-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Trocar Foto</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-cyan-500/40 hover:border-cyan-400 bg-cyan-950/20 hover:bg-cyan-950/40 p-5 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer transition-all group"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 group-hover:bg-cyan-500/20 flex items-center justify-center text-cyan-400 transition-colors">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xs font-bold text-white block">
+                        Tirar Foto ou Carregar da Galeria
+                      </span>
+                      <span className="text-[10px] text-cyan-300">
+                        Clique aqui para adicionar sua foto de perfil
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Nome Completo */}
               <div>
@@ -254,22 +380,22 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                     type="tel"
                     value={regPhone}
                     onChange={(e) => setRegPhone(formatPhone(e.target.value))}
-                    placeholder="(83) 98888-0000"
+                    placeholder="(83) 98822-1133"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
                     required
                   />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Seu telefone será seu login para acessar o app a qualquer momento.
-                </p>
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Usado para login e contato durante as corridas.
+                </span>
               </div>
 
-              {/* Bairro / Localização em Alagoinha */}
+              {/* Bairro / Endereço Frequente */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Bairro ou Referência em Alagoinha
+                  Bairro / Localidade em Alagoinha
                 </label>
-                <div className="relative mb-2">
+                <div className="relative">
                   <MapPin className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     id="input-passageiro-cadastro-endereco"
@@ -281,17 +407,16 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                   />
                 </div>
 
-                {/* Chips de seleção rápida de bairros */}
-                <div className="flex flex-wrap gap-1.5">
-                  {popularNeighborhoods.map((bairro) => (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {popularNeighborhoods.slice(0, 5).map((bairro) => (
                     <button
                       key={bairro}
                       type="button"
                       onClick={() => setRegAddress(bairro)}
-                      className={`text-[10px] font-medium px-2 py-1 rounded-lg border transition-all cursor-pointer ${
+                      className={`text-[10px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
                         regAddress === bairro
-                          ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 font-bold'
-                          : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-semibold'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
                       }`}
                     >
                       {bairro}
@@ -300,7 +425,7 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                 </div>
               </div>
 
-              {/* Senhas */}
+              {/* Senha e Confirmação */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -313,14 +438,14 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                       type={showPassword ? 'text' : 'password'}
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Crie uma senha"
+                      placeholder="Mínimo 3 dígitos"
                       className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
                     >
                       {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
@@ -346,14 +471,14 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                 </div>
               </div>
 
-              {/* Botão de Finalizar Cadastro */}
+              {/* Botão de Concluir Cadastro Imediato */}
               <button
                 id="btn-passageiro-submit-cadastro"
                 type="submit"
                 className="w-full py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-500 via-sky-400 to-blue-600 text-slate-950 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
               >
                 <CheckCircle2 className="w-4 h-4 text-slate-950" />
-                <span>Finalizar Cadastro e Entrar</span>
+                <span>Cadastrar e Começar a Usar</span>
               </button>
 
               <div className="pt-2 text-center">
@@ -362,7 +487,7 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                   onClick={() => setAuthMode('login')}
                   className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer"
                 >
-                  Já tem uma conta? Clique aqui para entrar
+                  Já possui conta? Clique aqui para entrar
                 </button>
               </div>
             </form>
@@ -372,9 +497,11 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
           {authMode === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               {loginError && (
-                <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-                  <span>{loginError}</span>
+                <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs space-y-2">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                    <span>{loginError}</span>
+                  </div>
                 </div>
               )}
 
@@ -402,7 +529,7 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                     Senha de Acesso
                   </label>
                   <a
-                    href={whatsappUrl}
+                    href={generalWhatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[11px] text-cyan-400 hover:text-cyan-300"
@@ -429,7 +556,7 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                 className="w-full py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Entrar e Pedir Viagem</span>
+                <span>Entrar no App de Viagens</span>
               </button>
 
               {/* Botão para mudar para cadastro */}
@@ -439,34 +566,9 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
                   onClick={() => setAuthMode('register')}
                   className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer"
                 >
-                  Novo passageiro? Cadastre-se em 30 segundos
+                  Ainda não tem conta? Criar conta com foto
                 </button>
               </div>
-
-              {/* Contas Demo Rápidas para Teste */}
-              {merchants.length > 0 && (
-                <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-xs space-y-2 mt-4">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Acesso Rápido de Teste:
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {merchants.slice(0, 2).map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          setLoginIdentifier(m.phone);
-                          setLoginPassword(m.password || '123');
-                        }}
-                        className="text-[11px] bg-slate-900 hover:bg-slate-850 border border-slate-750 text-slate-300 hover:text-cyan-300 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <User className="w-3 h-3 text-cyan-400" />
-                        <span>{m.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </form>
           )}
 
@@ -477,7 +579,7 @@ export const MerchantAuthScreen: React.FC<MerchantAuthScreenProps> = ({ onBack }
               <span>Central Nexo Viagens Alagoinha</span>
             </span>
             <a
-              href={whatsappUrl}
+              href={generalWhatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1"

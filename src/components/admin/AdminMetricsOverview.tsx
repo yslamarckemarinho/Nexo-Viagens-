@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
-  Package,
+  Navigation,
   Clock,
   CheckCircle2,
   User,
@@ -24,9 +24,11 @@ export const AdminMetricsOverview: React.FC<AdminMetricsOverviewProps> = ({ onNa
   const todayDateStr = new Date().toISOString().split('T')[0];
   const deliveriesToday = deliveries.filter((d) => d.createdAt.startsWith(todayDateStr)).length;
   const deliveriesInProgress = deliveries.filter(
-    (d) => d.status !== 'concluida' && d.status !== 'cancelada'
+    (d) => d.status !== 'concluida' && d.status !== 'corrida_concluida' && d.status !== 'cancelada'
   ).length;
-  const deliveriesCompleted = deliveries.filter((d) => d.status === 'concluida').length;
+  const deliveriesCompleted = deliveries.filter(
+    (d) => d.status === 'concluida' || d.status === 'corrida_concluida'
+  ).length;
   const activeMerchantsCount = merchants.filter((m) => m.active).length;
   const onlineCouriersCount = couriers.filter((c) => c.active && c.isOnline).length;
 

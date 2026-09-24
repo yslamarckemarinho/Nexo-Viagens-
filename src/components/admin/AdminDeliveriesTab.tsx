@@ -3,7 +3,7 @@ import { useApp, getStatusBadgeClasses, getStatusDescription } from '../../conte
 import { Delivery } from '../../types';
 import { getZoneBadgeDetails } from '../../utils/routeIntelligence';
 import {
-  Package,
+  Navigation,
   Search,
   Filter,
   Clock,
@@ -93,16 +93,16 @@ export const AdminDeliveriesTab: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Package className="w-5 h-5 text-cyan-400" />
+            <Navigation className="w-5 h-5 text-cyan-400" />
             <h3 className="font-bold text-white text-sm sm:text-base">
-              Monitoramento Operacional de Viagens ({filteredDeliveries.length})
+              Monitoramento Operacional de Corridas e Viagens ({filteredDeliveries.length})
             </h3>
           </div>
         </div>
 
         {filteredDeliveries.length === 0 ? (
           <div className="p-12 text-center text-slate-500 space-y-2">
-            <Package className="w-10 h-10 mx-auto text-slate-600 mb-2" />
+            <Navigation className="w-10 h-10 mx-auto text-slate-600 mb-2" />
             <p className="font-semibold text-slate-300">Nenhuma viagem encontrada</p>
             <p className="text-xs text-slate-500">Altere os filtros ou visualize solicitações criadas pelos passageiros.</p>
           </div>

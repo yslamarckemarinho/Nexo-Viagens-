@@ -386,42 +386,66 @@ export const MerchantPortal: React.FC = () => {
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="space-y-2">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="px-3 py-1 rounded-full bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-bold text-xs flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Nexo Viagens Alagoinha</span>
-            </span>
-
-            <span className="px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-slate-300 font-medium text-xs flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Pontos de Referência</span>
-            </span>
-
-            <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-xs flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{onlinePilots.length} motoristas online</span>
+        <div className="flex items-center gap-4">
+          {/* Passenger Photo Profile */}
+          <div className="relative shrink-0">
+            {currentMerchant.photoUrl || currentMerchant.foto_url ? (
+              <img
+                src={currentMerchant.photoUrl || currentMerchant.foto_url}
+                alt={currentMerchant.name}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl object-cover border-2 border-cyan-400 shadow-xl shadow-cyan-500/10"
+              />
+            ) : (
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border-2 border-cyan-500/40 flex items-center justify-center text-cyan-300 font-black text-2xl shadow-xl">
+                {currentMerchant.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-slate-900 flex items-center justify-center" title="Passageiro Verificado">
+              <Check className="w-3 h-3 text-slate-950 stroke-[3]" />
             </span>
           </div>
 
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Olá, {currentMerchant.name}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Viagens e deslocamentos com rapidez, agilidade e segurança com motoristas credenciados da Nexo Viagens.
-            </p>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-3 py-1 rounded-full bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-bold text-xs flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Nexo Viagens Alagoinha</span>
+              </span>
+
+              <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-xs flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{onlinePilots.length} pilotos online</span>
+              </span>
+            </div>
+
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                <span>Olá, {currentMerchant.name}</span>
+              </h1>
+              <p className="text-xs text-slate-400">
+                Experiência ágil modelo Uber com mototaxistas credenciados de Alagoinha-PB.
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Action Button & Wallet Glance */}
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs hidden sm:block">
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Saldo de Créditos:</span>
-            <span className="text-base font-black text-cyan-400">
+          <div className="p-3.5 rounded-2xl bg-slate-950 border border-cyan-500/30 text-xs">
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Saldo Pré-Pago:</span>
+            <span className="text-lg font-black text-cyan-400">
               R$ {currentMerchant.creditBalance.toFixed(2)}
             </span>
           </div>
+
+          <button
+            id="btn-open-recharge-top"
+            onClick={() => setShowRechargeModal(true)}
+            className="px-4 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-750 text-cyan-300 border border-cyan-500/40 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <Wallet className="w-4 h-4 text-cyan-400" />
+            <span>Recarga Pix</span>
+          </button>
 
           <button
             id="btn-open-request-ride"
@@ -432,7 +456,7 @@ export const MerchantPortal: React.FC = () => {
             className="flex-1 md:flex-none px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer transform active:scale-98"
           >
             <Navigation className="w-5 h-5" />
-            <span>Pedir Viagem</span>
+            <span>Pedir Agora</span>
           </button>
         </div>
       </div>
@@ -516,23 +540,109 @@ export const MerchantPortal: React.FC = () => {
           )}
 
           {activeDeliveries.length === 0 ? (
-            <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-4">
-              <div className="w-16 h-16 rounded-3xl bg-slate-950 border border-slate-800 flex items-center justify-center text-cyan-400 mx-auto">
-                <Navigation className="w-8 h-8" />
+            <div className="space-y-4">
+              {/* Uber-like "Para Onde Vamos?" Card */}
+              <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-cyan-500/10 via-blue-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
+
+                <div className="max-w-2xl space-y-6">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Experiência Instantânea Uber em Alagoinha
+                    </span>
+                    <h2 className="text-2xl sm:text-3xl font-black text-white">
+                      Para onde vamos hoje?
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-400">
+                      Chame um mototaxista credenciado em segundos com tarifa fixa e pagamento automático por créditos.
+                    </p>
+                  </div>
+
+                  {/* Search Bar "Para onde?" */}
+                  <div
+                    onClick={() => {
+                      setRideFormError(null);
+                      setShowNewRideModal(true);
+                    }}
+                    className="p-4 rounded-2xl bg-slate-950 border-2 border-cyan-500/40 hover:border-cyan-400 flex items-center justify-between gap-3 shadow-lg cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/20 group-hover:bg-cyan-500 text-cyan-400 group-hover:text-slate-950 flex items-center justify-center transition-colors">
+                        <Search className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-sm font-black text-white group-hover:text-cyan-300 block transition-colors">
+                          Digite seu destino ou escolha abaixo
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          Partida padrão: {pickupAddress || 'Ponto Central'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs">
+                      <span>Pedir</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+
+                  {/* Sugestões de Destinos Frequentes / Rápidos modelo Uber */}
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                      Destinos Populares em Alagoinha:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { title: 'Centro Comercial', sub: 'Praça Central', fee: feeCentral },
+                        { title: 'Igreja Matriz', sub: 'Centro', fee: feeCentral },
+                        { title: 'Pátio de Eventos', sub: 'Área de Lazer', fee: feeCentral },
+                        { title: 'Bairro São José', sub: 'Zona Residencial', fee: feeCentral },
+                        { title: 'Rua Nova', sub: 'Zona Urbana', fee: feeCentral },
+                        { title: 'Bairro Boa Vista', sub: 'Zona Alta', fee: feeDistante },
+                        { title: 'Conjunto Novo', sub: 'Zona Sul', fee: feeDistante },
+                        { title: 'Zona Rural / Sítio', sub: 'Sob Consulta', fee: settings.feeRural || 15 },
+                      ].map((item) => (
+                        <button
+                          key={item.title}
+                          type="button"
+                          onClick={() => {
+                            setDeliveryAddress(item.title);
+                            setShowNewRideModal(true);
+                          }}
+                          className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 text-left transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm">📍</span>
+                            <span className="text-[10px] font-bold text-cyan-400">R$ {item.fee.toFixed(2)}</span>
+                          </div>
+                          <span className="text-xs font-bold text-white group-hover:text-cyan-300 block truncate">
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate">
+                            {item.sub}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Informações de Agilidade & Segurança */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800/80 text-xs">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Pilotos com foto e verificação mútua</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <Radio className="w-4 h-4 text-cyan-400 shrink-0 animate-pulse" />
+                      <span>GPS inteligente atualizado a cada 15s</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <Wallet className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Créditos pré-pagos seguros pela Central</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="max-w-md mx-auto">
-                <h3 className="text-lg font-bold text-white">Nenhuma viagem em andamento</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Precisa se deslocar ou viajar em Alagoinha? Peça agora sua viagem com um motorista credenciado da Nexo Viagens.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowNewRideModal(true)}
-                className="px-6 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 cursor-pointer inline-flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Pedir Viagem Agora</span>
-              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -693,12 +803,23 @@ export const MerchantPortal: React.FC = () => {
                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       {hasCourier ? (
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-lg shrink-0">
-                            🚗
-                          </div>
+                          {delivery.courierPhotoUrl ? (
+                            <img
+                              src={delivery.courierPhotoUrl}
+                              alt={delivery.courierName || 'Piloto'}
+                              className="w-12 h-12 rounded-2xl object-cover border-2 border-emerald-400 shrink-0 shadow-md"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-lg shrink-0">
+                              🛵
+                            </div>
+                          )}
                           <div>
                             <p className="text-xs text-slate-400">Motorista Parceiro Confirmado:</p>
-                            <h4 className="font-bold text-white text-sm">{delivery.courierName}</h4>
+                            <h4 className="font-bold text-white text-sm flex items-center gap-1.5">
+                              <span>{delivery.courierName}</span>
+                              <span className="text-emerald-400 text-xs font-semibold">★ 4.9</span>
+                            </h4>
                             <p className="text-[11px] text-emerald-400 font-medium">Motorista credenciado pela Central Nexo Viagens</p>
                           </div>
                         </div>

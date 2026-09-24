@@ -119,9 +119,9 @@ export const AdminAuthScreen: React.FC<AdminAuthScreenProps> = ({ onBack }) => {
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
-              <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+              <Lock className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
               <span>
-                Credenciais padrão para testes: Usuário <strong className="text-white">admin</strong> e Senha <strong className="text-white">admin</strong> (alterável nas configurações).
+                Acesso restrito e criptografado para a administração e despacho da Central Nexo Viagens.
               </span>
             </div>
 

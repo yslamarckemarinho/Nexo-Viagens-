@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   User,
   ShieldAlert,
+  Clock,
 } from 'lucide-react';
 
 export const AdminMerchantsTab: React.FC = () => {
@@ -26,9 +27,11 @@ export const AdminMerchantsTab: React.FC = () => {
     editarComercio,
     toggleComercioStatus,
     ajustarCreditoManual,
+    confirmarPassageiro,
     settings,
   } = useApp();
 
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed'>('all');
   const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
   const [editingMerchant, setEditingMerchant] = useState<Merchant | null>(null);
@@ -48,13 +51,25 @@ export const AdminMerchantsTab: React.FC = () => {
   const [newPassword, setNewPassword] = useState('123456');
   const [newInitialCredit, setNewInitialCredit] = useState<number>(0);
 
-  const filteredMerchants = merchants.filter(
-    (m) =>
+  const pendingCount = merchants.filter((m) => m.status_cadastro === 'pendente').length;
+
+  const filteredMerchants = merchants.filter((m) => {
+    const matchesSearch =
       m.name.toLowerCase().includes(search.toLowerCase()) ||
       (m.ownerName && m.ownerName.toLowerCase().includes(search.toLowerCase())) ||
       m.phone.includes(search) ||
-      (m.loginUsername && m.loginUsername.toLowerCase().includes(search.toLowerCase()))
-  );
+      (m.loginUsername && m.loginUsername.toLowerCase().includes(search.toLowerCase()));
+
+    if (!matchesSearch) return false;
+
+    if (statusFilter === 'pending') {
+      return m.status_cadastro === 'pendente';
+    }
+    if (statusFilter === 'confirmed') {
+      return m.status_cadastro === 'confirmado' || (m.active && m.status_cadastro !== 'pendente');
+    }
+    return true;
+  });
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +191,50 @@ Qualquer dúvida, estamos à disposição na Central Nexo Viagens!`;
         </button>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('all')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            statusFilter === 'all'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+              : 'bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-white'
+          }`}
+        >
+          Todos ({merchants.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter('pending')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            statusFilter === 'pending'
+              ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
+              : 'bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-amber-300'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5 text-amber-400" />
+          <span>Aguardando Confirmação ({pendingCount})</span>
+          {pendingCount > 0 && (
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter('confirmed')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            statusFilter === 'confirmed'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+              : 'bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-emerald-300'
+          }`}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Confirmados / Ativos ({merchants.length - pendingCount})</span>
+        </button>
+      </div>
+
       {/* Merchants Grid / List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredMerchants.length === 0 ? (
@@ -189,16 +248,30 @@ Qualquer dúvida, estamos à disposição na Central Nexo Viagens!`;
             <div
               key={merchant.id}
               className={`p-5 rounded-3xl border transition-all space-y-4 ${
-                merchant.active
+                merchant.status_cadastro === 'pendente'
+                  ? 'bg-amber-950/20 border-amber-500/40 shadow-xl'
+                  : merchant.active
                   ? 'bg-slate-900 border-slate-800 hover:border-cyan-500/40 shadow-xl'
                   : 'bg-slate-900/60 border-rose-900/40 opacity-80'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-black text-lg">
-                    {merchant.name.charAt(0).toUpperCase()}
-                  </div>
+                  {merchant.photoUrl || merchant.foto_url ? (
+                    <img
+                      src={merchant.photoUrl || merchant.foto_url}
+                      alt={merchant.name}
+                      className="w-12 h-12 rounded-2xl object-cover border-2 border-cyan-400 shrink-0 shadow-md"
+                    />
+                  ) : (
+                    <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center font-black text-lg ${
+                      merchant.status_cadastro === 'pendente'
+                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                        : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400'
+                    }`}>
+                      {merchant.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h3 className="font-bold text-white text-base leading-snug">{merchant.name}</h3>
                     <p className="text-xs text-slate-400">{merchant.ownerName || 'Passageiro'}</p>
@@ -207,14 +280,37 @@ Qualquer dúvida, estamos à disposição na Central Nexo Viagens!`;
 
                 <span
                   className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                    merchant.active
+                    merchant.status_cadastro === 'pendente'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                      : merchant.active
                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                       : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
                   }`}
                 >
-                  {merchant.active ? 'Ativo' : 'Bloqueado'}
+                  {merchant.status_cadastro === 'pendente'
+                    ? 'Aguardando Confirmação'
+                    : merchant.active
+                    ? 'Confirmado / Ativo'
+                    : 'Bloqueado'}
                 </span>
               </div>
+
+              {/* Se o cadastro estiver pendente, exibir card de ação direta para a Central */}
+              {merchant.status_cadastro === 'pendente' && (
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2 text-amber-300 text-xs font-semibold">
+                    <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Cadastro solicitado pelo app. Confirme para liberar recarga e viagens.</span>
+                  </div>
+                  <button
+                    onClick={() => confirmarPassageiro(merchant.id, 'Central ADM')}
+                    className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer shrink-0"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Confirmar Cadastro</span>
+                  </button>
+                </div>
+              )}
 
               {/* Information Rows */}
               <div className="space-y-1.5 text-xs text-slate-300">

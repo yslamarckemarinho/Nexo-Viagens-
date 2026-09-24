@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard,
-  Package,
+  Navigation,
   Users,
   Car,
   CreditCard,
@@ -146,8 +146,8 @@ export const AdminPortal: React.FC = () => {
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            <Package className="w-4 h-4" />
-            <span>Viagens</span>
+            <Navigation className="w-4 h-4" />
+            <span>Corridas & Viagens</span>
             {activeDeliveriesCount > 0 && (
               <span
                 className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${

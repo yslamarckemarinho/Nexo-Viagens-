@@ -10,15 +10,26 @@ import {
   FileSpreadsheet,
   ArrowUpRight,
   ShieldCheck,
+  Car,
+  QrCode,
+  Copy,
+  Check,
+  Send,
+  Users,
+  AlertCircle,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const AdminDreReportTab: React.FC = () => {
   const { deliveries, settings, couriers } = useApp();
   const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'tudo'>('mes');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [settledDriverIds, setSettledDriverIds] = useState<Record<string, boolean>>({});
 
-  // Filtrar corridas concluídas
-  const completedDeliveries = deliveries.filter((d) => d.status === 'corrida_concluida');
+  // Filtrar corridas concluídas (suportando status 'corrida_concluida' ou 'concluida')
+  const completedDeliveries = deliveries.filter(
+    (d) => d.status === 'corrida_concluida' || d.status === 'concluida'
+  );
 
   // Filtragem por período
   const now = new Date();
@@ -60,6 +71,48 @@ export const AdminDreReportTab: React.FC = () => {
   const ticketMedio = totalViagens > 0 ? faturamentoBruto / totalViagens : 0;
   const margemCentralPercentual =
     faturamentoBruto > 0 ? (totalTaxasCentral / faturamentoBruto) * 100 : 0;
+
+  // Fechamento individual por Motorista / Piloto
+  const driverBreakdown = couriers.map((courier) => {
+    const courierRides = filteredDeliveries.filter(
+      (d) => d.courierId === courier.id || d.mototaxista_id === courier.id || d.courierName === courier.name
+    );
+    const ridesCount = courierRides.length;
+    const grossTotal = courierRides.reduce(
+      (acc, d) => acc + (d.valor_corrida || d.deliveryFee || 0),
+      0
+    );
+    const centralCommission = courierRides.reduce(
+      (acc, d) => acc + (d.valor_destinado_central || d.centralFee || 0),
+      0
+    );
+    const netEarnings = courierRides.reduce(
+      (acc, d) => acc + (d.valor_liquido_mototaxista || d.courierEarnings || 0),
+      0
+    );
+
+    return {
+      courier,
+      ridesCount,
+      grossTotal,
+      centralCommission,
+      netEarnings,
+      isSettled: !!settledDriverIds[courier.id],
+    };
+  }).filter((item) => item.ridesCount > 0 || item.courier.active);
+
+  const handleCopyPix = (pixKey: string) => {
+    navigator.clipboard.writeText(pixKey);
+    setCopiedKey(pixKey);
+    setTimeout(() => setCopiedKey(null), 2500);
+  };
+
+  const handleToggleSettled = (courierId: string) => {
+    setSettledDriverIds((prev) => ({
+      ...prev,
+      [courierId]: !prev[courierId],
+    }));
+  };
 
   // Exportar para CSV
   const handleExportCSV = () => {
@@ -258,6 +311,143 @@ export const AdminDreReportTab: React.FC = () => {
             <span>R$ {totalTaxasCentral.toFixed(2)}</span>
           </div>
         </div>
+      </div>
+
+      {/* NOVA SEÇÃO: FECHAMENTO DE REPASSES POR MOTORISTA / PILOTO */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <Car className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <span>Fechamento Individual por Motorista Parceiro</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                  {driverBreakdown.length} pilotos
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Resumo de corridas, taxas da Central retidas e chave Pix para pagamento dos pilotos
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {driverBreakdown.length === 0 ? (
+          <p className="text-xs text-slate-500 py-6 text-center">
+            Nenhum motorista com viagens no período selecionado.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {driverBreakdown.map((item) => {
+              const { courier, ridesCount, grossTotal, centralCommission, netEarnings, isSettled } = item;
+              return (
+                <div
+                  key={courier.id}
+                  className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                    isSettled
+                      ? 'bg-slate-950/50 border-emerald-500/40 opacity-90'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {courier.photoUrl ? (
+                        <img
+                          src={courier.photoUrl}
+                          alt={courier.name}
+                          className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 text-cyan-400 flex items-center justify-center font-bold text-sm shrink-0">
+                          {courier.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-white text-sm truncate">{courier.name}</h4>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {courier.phone} • {courier.vehiclePlate || 'Moto'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        isSettled
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      }`}
+                    >
+                      {isSettled ? 'Fechado / Pago' : 'Aberto'}
+                    </span>
+                  </div>
+
+                  {/* Resumo Financeiro do Piloto */}
+                  <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-slate-900 border border-slate-850 text-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Corridas</span>
+                      <span className="font-black text-white text-xs">{ridesCount}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Central</span>
+                      <span className="font-bold text-cyan-400 text-xs">
+                        R$ {centralCommission.toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Líquido</span>
+                      <span className="font-black text-amber-300 text-xs">
+                        R$ {netEarnings.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Chave Pix do Piloto */}
+                  <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2 text-xs">
+                    <div className="min-w-0 flex items-center gap-1.5 text-slate-300">
+                      <QrCode className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span className="font-mono text-[11px] truncate">
+                        {courier.pixKey || courier.phone}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPix(courier.pixKey || courier.phone)}
+                      className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                    >
+                      {copiedKey === (courier.pixKey || courier.phone) ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span>Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Pix</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Botão de Fechamento */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSettled(courier.id)}
+                    className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                      isSettled
+                        ? 'bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-750'
+                        : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{isSettled ? 'Reabrir Fechamento' : 'Marcar como Acerto Feito / Pago'}</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Lista de Corridas Filtradas */}

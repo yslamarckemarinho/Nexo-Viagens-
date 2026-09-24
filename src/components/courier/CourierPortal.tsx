@@ -768,8 +768,29 @@ export const CourierPortal: React.FC = () => {
                         ? '1. EMBARQUE DO PASSAGEIRO'
                         : '1. LOCAL DE RETIRADA / COLETA'}
                     </span>
-                    <p className="font-bold text-white text-sm">{myActiveDelivery.merchantName}</p>
-                    <p className="text-slate-300">{myActiveDelivery.pickupAddress}</p>
+
+                    {/* Passenger Photo & Name (Visual Uber Verification) */}
+                    <div className="flex items-center gap-3 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+                      {myActiveDelivery.passengerPhotoUrl || myActiveDelivery.merchantPhotoUrl ? (
+                        <img
+                          src={myActiveDelivery.passengerPhotoUrl || myActiveDelivery.merchantPhotoUrl}
+                          alt={myActiveDelivery.merchantName}
+                          className="w-12 h-12 rounded-xl object-cover border border-cyan-400 shrink-0 shadow-md"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 font-bold text-lg shrink-0">
+                          {myActiveDelivery.merchantName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-cyan-400 uppercase font-bold block">
+                          Passageiro Confirmado
+                        </span>
+                        <p className="font-bold text-white text-sm truncate">{myActiveDelivery.merchantName}</p>
+                      </div>
+                    </div>
+
+                    <p className="text-slate-300 text-xs">{myActiveDelivery.pickupAddress}</p>
                     <div className="flex items-center gap-2 pt-1">
                       <a
                         href={gerarUrlGoogleMapsRota(

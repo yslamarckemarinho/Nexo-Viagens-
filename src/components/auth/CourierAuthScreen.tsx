@@ -74,10 +74,10 @@ export const CourierAuthScreen: React.FC<CourierAuthScreenProps> = ({ onBack }) 
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">
-                Acesso do Motorista
+                Acesso do Moto Táxi
               </h2>
               <p className="text-xs text-slate-400">
-                Acesse com o login e senha gerados pela Central Nexo Viagens
+                Acesse com o login e senha fornecidos pela Central Nexo Viagens
               </p>
             </div>
           </div>
