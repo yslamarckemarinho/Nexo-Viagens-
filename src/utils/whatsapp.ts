@@ -18,11 +18,27 @@ export function cleanWhatsAppNumber(phone: string): string {
 /**
  * Gera o link direto de navegação no Google Maps com rota para Alagoinha-PB
  */
-export function generateMapsNavigationUrl(address: string): string {
+export function generateMapsNavigationUrl(address: string, lat?: number, lng?: number): string {
+  if (lat && lng) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
   const fullAddress = address.toLowerCase().includes('alagoinha')
     ? address
     : `${address}, Alagoinha - PB`;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+}
+
+/**
+ * Gera o link direto de navegação no Waze
+ */
+export function generateWazeNavigationUrl(address: string, lat?: number, lng?: number): string {
+  if (lat && lng) {
+    return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+  }
+  const fullAddress = address.toLowerCase().includes('alagoinha')
+    ? address
+    : `${address}, Alagoinha - PB`;
+  return `https://waze.com/ul?q=${encodeURIComponent(fullAddress)}&navigate=yes`;
 }
 
 /**

@@ -148,6 +148,12 @@ export interface Courier extends Mototaxista {
   loginUsername?: string;
   password?: string;
   createdAt: string;
+  // Sugestões 2.1, 3.3 e 4.2
+  selfieVerificadaHoje?: boolean;
+  ultimaSelfieVerificacaoEm?: string;
+  rejeicoesConsecutivas?: number;
+  emPausaAutomaticaAte?: string;
+  metaDiariaPersonalizada?: number;
 }
 
 // PASSAGEIRO (Compatibilidade com Merchant)
@@ -172,6 +178,15 @@ export interface Passageiro {
   created_at?: string;
 }
 
+export interface LocalFavorito {
+  id: string;
+  nome: string; // Ex: "Minha Casa", "Trabalho", "Academia", "Casa da Mãe"
+  endereco: string;
+  icone?: 'casa' | 'trabalho' | 'coracao' | 'estrela' | 'pino';
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface Merchant extends Passageiro {
   name: string;
   ownerName: string;
@@ -189,7 +204,18 @@ export interface Merchant extends Passageiro {
   pixKey?: string;
   loginUsername?: string;
   password?: string;
+  locaisFavoritos?: LocalFavorito[];
   createdAt: string;
+}
+
+// BROADCAST ALERT DA CENTRAL PARA MOTOTAXISTAS
+export interface BroadcastAlert {
+  id: string;
+  mensagem: string;
+  tipo: 'alerta' | 'chuva' | 'demanda' | 'urgente';
+  criado_em: string;
+  autor: string;
+  ativo: boolean;
 }
 
 // CORRIDA
@@ -200,6 +226,10 @@ export interface Corrida {
   passageiro_nome?: string;
   passageiro_telefone?: string;
   passageiro_foto?: string;
+  // Pedir para um terceiro / familiar
+  pedir_para_terceiro?: boolean;
+  terceiro_nome?: string;
+  terceiro_telefone?: string;
   
   mototaxista_id?: string;
   mototaxista_nome?: string;
@@ -225,6 +255,9 @@ export interface Corrida {
   taxa_mototaxista?: number;
   valor_destinado_central?: number;
   valor_liquido_mototaxista?: number;
+  // Taxa de cancelamento tardia
+  taxa_cancelamento_aplicada?: number;
+  taxa_cancelamento_repassada_piloto?: boolean;
   
   // Status e Horários
   status: StatusCorrida | DeliveryStatus;
@@ -345,6 +378,11 @@ export interface ConfiguracoesCentral {
   tarifa_dinamica_adicional?: number;
   // Sugestão 8: Anti-Vaga Ocupada / Inatividade na Praça
   limite_inatividade_fila_minutos?: number;
+  // Sugestões 3.3 e 5.2
+  taxa_cancelamento_tardia_valor?: number;
+  minutos_carencia_cancelamento?: number;
+  limite_rejeicoes_pausa?: number;
+  minutos_pausa_rejeicoes?: number;
   chave_pix_central: string;
   tipo_chave_pix_central: PixKeyType;
   beneficiario_pix_central: string;

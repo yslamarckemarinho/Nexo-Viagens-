@@ -42,6 +42,13 @@ import {
   LocateFixed,
   RefreshCw,
   Compass,
+  Heart,
+  Users,
+  Home,
+  Briefcase,
+  Trash2,
+  Bookmark,
+  Bell,
 } from 'lucide-react';
 import {
   generateCustomerWhatsAppUrl,
@@ -71,6 +78,9 @@ export const MerchantPortal: React.FC = () => {
     enviarMensagemChat,
     acionarSos,
     avaliarCorrida,
+    adicionarLocalFavorito,
+    removerLocalFavorito,
+    broadcastAlerts,
   } = useApp();
 
   const feeCentral = settings.feeUrbanCentral || 3.50;
@@ -97,6 +107,17 @@ export const MerchantPortal: React.FC = () => {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [customerName, setCustomerName] = useState(currentMerchant?.name || 'Passageiro');
   const [customerPhone, setCustomerPhone] = useState(currentMerchant?.phone || '');
+  // Sugestão 1.3: Pedir para um Conhecido / Familiar
+  const [pedirParaTerceiro, setPedirParaTerceiro] = useState(false);
+  const [terceiroNome, setTerceiroNome] = useState('');
+  const [terceiroTelefone, setTerceiroTelefone] = useState('');
+
+  // Sugestão 1.2: Modal e gerenciamento de Favoritos
+  const [showAddFavoritoModal, setShowAddFavoritoModal] = useState(false);
+  const [novoFavoritoNome, setNovoFavoritoNome] = useState('');
+  const [novoFavoritoEndereco, setNovoFavoritoEndereco] = useState('');
+  const [novoFavoritoIcone, setNovoFavoritoIcone] = useState<'casa' | 'trabalho' | 'coracao' | 'estrela' | 'pino'>('casa');
+  
   const [deliveryFee, setDeliveryFee] = useState<number>(feeCentral);
   const [observations, setObservations] = useState('');
   const [rideFormError, setRideFormError] = useState<string | null>(null);
@@ -241,6 +262,10 @@ export const MerchantPortal: React.FC = () => {
       setRideFormError('Informe um WhatsApp válido para acompanhar o piloto.');
       return;
     }
+    if (pedirParaTerceiro && !terceiroNome.trim()) {
+      setRideFormError('Informe o nome da pessoa/familiar para quem você está pedindo a corrida.');
+      return;
+    }
 
     // Validação estrita: Pagamento exclusivo via créditos pré-pagos
     if (currentMerchant.creditBalance < deliveryFee) {
@@ -264,8 +289,11 @@ export const MerchantPortal: React.FC = () => {
         merchantId: currentMerchant.id,
         pickupAddress: pickupAddress.trim(),
         deliveryAddress: deliveryAddress.trim(),
-        customerName: customerName.trim() || currentMerchant.name,
-        customerPhone: customerPhone.trim(),
+        customerName: pedirParaTerceiro && terceiroNome.trim() ? terceiroNome.trim() : (customerName.trim() || currentMerchant.name),
+        customerPhone: pedirParaTerceiro && terceiroTelefone.trim() ? terceiroTelefone.trim() : customerPhone.trim(),
+        pedirParaTerceiro,
+        terceiroNome: pedirParaTerceiro ? terceiroNome.trim() : undefined,
+        terceiroTelefone: pedirParaTerceiro ? terceiroTelefone.trim() : undefined,
         deliveryFee,
         zoneType,
         isRural: selectedPracaId === 'praca_3_rural',
@@ -505,6 +533,29 @@ export const MerchantPortal: React.FC = () => {
         </button>
       </div>
 
+      {/* COMUNICADOS / BROADCAST DA CENTRAL NEXO */}
+      {broadcastAlerts && broadcastAlerts.filter(a => a.ativo && (a.publico_alvo === 'todos' || a.publico_alvo === 'passageiros')).map(alert => (
+        <div
+          key={alert.id}
+          className={`p-4 rounded-2xl border shadow-lg space-y-1.5 ${
+            alert.nivel === 'urgente'
+              ? 'bg-rose-950/40 border-rose-500/50 text-rose-200'
+              : alert.nivel === 'alerta'
+              ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
+              : 'bg-cyan-950/40 border-cyan-500/50 text-cyan-200'
+          }`}
+        >
+          <div className="flex items-center gap-2 font-black text-sm">
+            <Bell className="w-4 h-4 shrink-0 animate-bounce" />
+            <span>[COMUNICADO CENTRAL NEXO] {alert.titulo}</span>
+          </div>
+          <p className="text-xs leading-relaxed opacity-90">{alert.mensagem}</p>
+          <span className="text-[10px] opacity-70 block">
+            Emitido por {alert.criado_por} • {new Date(alert.criado_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      ))}
+
       {/* TAB 1: VIAGENS EM ANDAMENTO */}
       {activeTab === 'ativas' && (
         <div className="space-y-4">
@@ -586,6 +637,80 @@ export const MerchantPortal: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Sugestão 1.2: Favoritos com 1 Toque (Casa, Trabalho, Mãe, etc.) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400" />
+                        Meus Favoritos (1 Toque):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNovoFavoritoNome('');
+                          setNovoFavoritoEndereco('');
+                          setShowAddFavoritoModal(true);
+                        }}
+                        className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Adicionar Favorito</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {/* Favoritos fixos ou personalizados do usuário */}
+                      {(currentMerchant.locaisFavoritos && currentMerchant.locaisFavoritos.length > 0
+                        ? currentMerchant.locaisFavoritos
+                        : [
+                            { id: 'fav-casa', nome: 'Minha Casa', endereco: currentMerchant.address || 'Centro, Alagoinha-PB', icone: 'casa' },
+                            { id: 'fav-trabalho', nome: 'Trabalho / Comércio', endereco: 'Rua Nova, Centro, Alagoinha-PB', icone: 'trabalho' },
+                          ]
+                      ).map((fav: any) => (
+                        <div
+                          key={fav.id}
+                          className="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-cyan-500/50 flex flex-col justify-between group transition-all"
+                        >
+                          <div
+                            onClick={() => {
+                              setDeliveryAddress(fav.endereco);
+                              setShowNewRideModal(true);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-base">
+                                {fav.icone === 'casa' ? '🏠' : fav.icone === 'trabalho' ? '💼' : fav.icone === 'estrela' ? '⭐' : '❤️'}
+                              </span>
+                              <span className="text-[10px] font-bold text-cyan-400">1 Toque</span>
+                            </div>
+                            <span className="text-xs font-black text-white group-hover:text-cyan-300 block truncate">
+                              {fav.nome}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block truncate">
+                              {fav.endereco}
+                            </span>
+                          </div>
+
+                          {currentMerchant.locaisFavoritos && currentMerchant.locaisFavoritos.some((f) => f.id === fav.id) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removerLocalFavorito(currentMerchant.id, fav.id);
+                              }}
+                              className="mt-2 text-[10px] text-slate-500 hover:text-rose-400 flex items-center gap-1 transition-colors self-end"
+                              title="Remover dos favoritos"
+                            >
+                              <Trash2 className="w-2.5 h-2.5" />
+                              <span>Excluir</span>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Sugestões de Destinos Frequentes / Rápidos modelo Uber */}
                   <div>
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
@@ -664,6 +789,13 @@ export const MerchantPortal: React.FC = () => {
                         <span className="px-2.5 py-1 rounded-full bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold text-xs">
                           {delivery.serviceCategory === 'passageiro' ? '👤 Viagem de Passageiro' : '📦 Encomenda Expressa'}
                         </span>
+
+                        {delivery.pedirParaTerceiro && (
+                          <span className="px-2.5 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-bold text-xs flex items-center gap-1">
+                            <Users className="w-3 h-3 text-indigo-400" />
+                            <span>Para: {delivery.terceiroNome || delivery.customerName}</span>
+                          </span>
+                        )}
 
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${badge.bg} ${badge.text}`}>
                           {badge.label}
@@ -1307,34 +1439,95 @@ export const MerchantPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* Dados do Passageiro */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Nome do Passageiro *
-                </label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Seu nome"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder:text-slate-500 text-xs focus:outline-none focus:border-cyan-400"
-                  required
-                />
+            {/* Dados do Passageiro & Sugestão 1.3: Pedir para Terceiro / Familiar */}
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-bold text-white">Quem vai viajar?</span>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setPedirParaTerceiro(!pedirParaTerceiro)}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    pedirParaTerceiro
+                      ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>{pedirParaTerceiro ? '✓ Pedindo para Familiar / Amigo' : 'Pedir para Outra Pessoa?'}</span>
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  WhatsApp para Contato e GPS *
-                </label>
-                <input
-                  type="text"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="(83) 99999-0000"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder:text-slate-500 text-xs focus:outline-none focus:border-cyan-400"
-                  required
-                />
-              </div>
+
+              {!pedirParaTerceiro ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Nome do Passageiro *
+                    </label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Seu nome"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-500 text-xs focus:outline-none focus:border-cyan-400"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      WhatsApp para Contato e GPS *
+                    </label>
+                    <input
+                      type="text"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="(83) 99999-0000"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-500 text-xs focus:outline-none focus:border-cyan-400"
+                      required
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/40 space-y-2.5">
+                  <div className="flex items-center gap-2 text-cyan-300 text-xs font-bold">
+                    <Users className="w-4 h-4 text-cyan-400" />
+                    <span>Dados do Passageiro que irá embarcar (Familiar / Conhecido):</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    O motorista receberá o nome e o WhatsApp da pessoa que vai embarcar. O valor continuará sendo pago pelos seus créditos pré-pagos!
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-cyan-200 mb-1">
+                        Nome da Pessoa / Familiar *
+                      </label>
+                      <input
+                        type="text"
+                        value={terceiroNome}
+                        onChange={(e) => setTerceiroNome(e.target.value)}
+                        placeholder="Ex: Maria (Mãe), João (Filho)..."
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-cyan-500/50 text-white placeholder:text-slate-500 text-xs focus:outline-none focus:border-cyan-300"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-cyan-200 mb-1">
+                        WhatsApp do Passageiro (Opcional):
+                      </label>
+                      <input
+                        type="text"
+                        value={terceiroTelefone}
+                        onChange={(e) => setTerceiroTelefone(e.target.value)}
+                        placeholder="Ex: (83) 99888-7766"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-500 text-xs focus:outline-none focus:border-cyan-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* FORMA DE PAGAMENTO EXCLUSIVA: 100% CRÉDITOS PRÉ-PAGOS DA CENTRAL */}
@@ -1702,6 +1895,120 @@ export const MerchantPortal: React.FC = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ADICIONAR FAVORITO COM 1 TOQUE */}
+      {showAddFavoritoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                  <Heart className="w-5 h-5 fill-rose-500 text-rose-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Salvar Local Favorito</h3>
+                  <p className="text-xs text-slate-400">Peça corridas para este local com 1 toque</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddFavoritoModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!novoFavoritoNome.trim() || !novoFavoritoEndereco.trim()) return;
+                adicionarLocalFavorito(currentMerchant.id, {
+                  nome: novoFavoritoNome.trim(),
+                  endereco: novoFavoritoEndereco.trim(),
+                  icone: novoFavoritoIcone,
+                });
+                setShowAddFavoritoModal(false);
+                setNovoFavoritoNome('');
+                setNovoFavoritoEndereco('');
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="block font-semibold text-slate-300 mb-1">
+                  Ícone Representativo:
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: 'casa', label: 'Casa', icon: '🏠' },
+                    { id: 'trabalho', label: 'Trabalho', icon: '💼' },
+                    { id: 'coracao', label: 'Amor/Família', icon: '❤️' },
+                    { id: 'estrela', label: 'Especial', icon: '⭐' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setNovoFavoritoIcone(item.id as any)}
+                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                        novoFavoritoIcone === item.id
+                          ? 'bg-cyan-500/20 border-cyan-400 text-white ring-1 ring-cyan-400'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-xl block">{item.icon}</span>
+                      <span className="text-[10px] font-bold block mt-1">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-300 mb-1">
+                  Nome do Local *
+                </label>
+                <input
+                  type="text"
+                  value={novoFavoritoNome}
+                  onChange={(e) => setNovoFavoritoNome(e.target.value)}
+                  placeholder="Ex: Casa da Minha Mãe, Academia, Escola..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-300 mb-1">
+                  Endereço / Ponto de Referência em Alagoinha *
+                </label>
+                <input
+                  type="text"
+                  value={novoFavoritoEndereco}
+                  onChange={(e) => setNovoFavoritoEndereco(e.target.value)}
+                  placeholder="Ex: Rua Nova, nº 120, próx. ao mercadinho..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddFavoritoModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black transition-all shadow-md cursor-pointer"
+                >
+                  Salvar nos Favoritos
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

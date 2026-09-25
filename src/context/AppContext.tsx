@@ -112,6 +112,20 @@ interface AppContextType {
   // Tarifa Dinâmica & Bandeira Especial (Clima/Eventos)
   toggleTarifaDinamica: (ativa: boolean, motivo?: string, adicional?: number) => void;
 
+  // Sugestão 3.2: Broadcast / Comunicados da Central para Pilotos
+  broadcastAlerts: BroadcastAlert[];
+  enviarBroadcastAlert: (mensagem: string, tipo?: 'alerta' | 'chuva' | 'demanda' | 'urgente') => void;
+  removerBroadcastAlert: (id: string) => void;
+
+  // Sugestão 4.2: Verificação Facial Diária (Selfie do Piloto)
+  validarSelfieDiariaPiloto: (courierId: string, fotoBase64: string) => { success: boolean; error?: string };
+
+  // Sugestão 3.3: Registrar rejeição e aplicar pausa automática por rejeições consecutivas
+  registrarRejeicaoChamado: (courierId: string) => void;
+
+  // Sugestão 2.1: Meta Diária Personalizada do Piloto
+  definirMetaDiariaPiloto: (courierId: string, metaValor: number) => void;
+
   // Rastreio Público de Corrida (Segurança da Família)
   obterCorridaPorCodigo: (codigo: string) => Delivery | undefined;
 
@@ -148,6 +162,10 @@ interface AppContextType {
     destinoLongitude?: number;
     observations?: string;
     notes?: string;
+    // Sugestão 1.3: Pedir para terceiro / familiar
+    pedirParaTerceiro?: boolean;
+    terceiroNome?: string;
+    terceiroTelefone?: string;
   }) => { success: boolean; error?: string; delivery?: Delivery };
 
   // Telemetria GPS em Tempo Real (Loop Inteligente de 15s)
@@ -185,6 +203,9 @@ interface AppContextType {
   toggleComercioStatus: (id: string) => void;
   confirmarPassageiro: (merchantId: string, creditBonus?: number) => void;
   ajustarCreditoManual: (merchantId: string, amountChange: number, reason: string) => void;
+  // Sugestão 1.2: Favoritos com 1 Toque
+  adicionarLocalFavorito: (merchantId: string, favorito: Omit<LocalFavorito, 'id'>) => void;
+  removerLocalFavorito: (merchantId: string, favoritoId: string) => void;
 
   // Courier / Piloto Management
   autorizarPiloto: (courierId: string, status: PilotApprovalStatus) => void;
@@ -293,6 +314,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_PRACAS;
   });
 
+  const [broadcastAlerts, setBroadcastAlerts] = useState<BroadcastAlert[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_PREFIX}broadcast_alerts`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { /* fallback */ }
+    }
+    return [
+      {
+        id: 'alerta-boas-vindas',
+        mensagem: '📢 Central Nexo: Mantenham o capacete extra e atenção aos passageiros na saída dos colégios.',
+        tipo: 'alerta',
+        criado_em: new Date().toISOString(),
+        autor: 'Central Nexo',
+        ativo: true,
+      },
+    ];
+  });
+
   const [isSupabaseActive, setIsSupabaseActive] = useState<boolean>(() => isSupabaseConfigured());
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
@@ -332,6 +370,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(`${STORAGE_PREFIX}pracas`, JSON.stringify(pracas));
   }, [pracas]);
+
+  useEffect(() => {
+    localStorage.setItem(`${STORAGE_PREFIX}broadcast_alerts`, JSON.stringify(broadcastAlerts));
+  }, [broadcastAlerts]);
 
   // ============================================================================
   // SUPABASE REALTIME & SINCRONIZAÇÃO EM NUVEM
@@ -781,6 +823,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     destinoLongitude?: number;
     observations?: string;
     notes?: string;
+    pedirParaTerceiro?: boolean;
+    terceiroNome?: string;
+    terceiroTelefone?: string;
   }) => {
     const merchant = merchants.find((m) => m.id === params.merchantId);
     if (!merchant) return { success: false, error: 'Passageiro não encontrado.' };
@@ -836,6 +881,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       code,
       serviceCategory: params.serviceCategory || 'passageiro',
       passengerCount: params.passengerCount || 1,
+      // Sugestão 1.3: Pedir para terceiro / familiar
+      pedir_para_terceiro: params.pedirParaTerceiro || false,
+      terceiro_nome: params.terceiroNome?.trim() || undefined,
+      terceiro_telefone: params.terceiroTelefone?.trim() || undefined,
       itemDescription: params.itemDescription?.trim() || undefined,
       pracaZoneId: params.pracaZoneId || 'praca_1_centro',
       pracaZoneName: params.pracaZoneName || 'Ponto 1 - Centro',
@@ -1319,23 +1368,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? session.adminName || 'Central Nexo'
         : delivery.merchantName;
 
-    // Refund credits to merchant
+    // Sugestão 5.2: Taxa de Cancelamento Tardia (Proteção do Piloto)
+    // Se o motorista já aceitou e se passaram mais de X minutos (ou já estava a caminho/chegou)
+    const taxaCancelamentoConfig = settings.taxa_cancelamento_tardia_valor ?? 2.0;
+    const minutosCarencia = settings.minutos_carencia_cancelamento ?? 3;
+    
+    let aplicarTaxaCancelamento = false;
+    let valorTaxaCancelamento = 0;
+
+    if (
+      cancelledByRole === 'merchant' &&
+      delivery.courierId &&
+      delivery.acceptedAt &&
+      (delivery.status === 'aceita' ||
+        delivery.status === 'a_caminho_coleta' ||
+        delivery.status === 'chegou_ao_embarque' ||
+        delivery.status === 'a_caminho_entrega')
+    ) {
+      const minutosDesdeAceite = (new Date(now).getTime() - new Date(delivery.acceptedAt).getTime()) / (1000 * 60);
+      if (minutosDesdeAceite > minutosCarencia || delivery.status === 'chegou_ao_embarque') {
+        aplicarTaxaCancelamento = true;
+        valorTaxaCancelamento = Math.min(taxaCancelamentoConfig, delivery.deliveryFee);
+      }
+    }
+
+    // Refund credits to merchant (descontando taxa de cancelamento tardio, se aplicável)
     const merchant = merchants.find((m) => m.id === delivery.merchantId);
     let prevBal = 0;
     let newBal = 0;
+    const valorEstorno = delivery.deliveryFee - valorTaxaCancelamento;
+
     if (merchant) {
       prevBal = merchant.creditBalance;
-      newBal = prevBal + delivery.deliveryFee;
+      newBal = prevBal + valorEstorno;
       setMerchants((prev) =>
         prev.map((m) =>
           m.id === merchant.id
             ? {
                 ...m,
                 creditBalance: newBal,
-                totalSpent: Math.max(0, m.totalSpent - delivery.deliveryFee),
+                totalSpent: Math.max(0, m.totalSpent - valorEstorno),
                 totalDeliveries: Math.max(0, m.totalDeliveries - 1),
               }
             : m
+        )
+      );
+    }
+
+    // Se houve taxa de cancelamento tardio, repassar o valor integral para o saldo acumulado do motorista
+    if (aplicarTaxaCancelamento && delivery.courierId) {
+      setCouriers((prev) =>
+        prev.map((c) =>
+          c.id === delivery.courierId
+            ? {
+                ...c,
+                accumulatedBalance: c.accumulatedBalance + valorTaxaCancelamento,
+                totalGrossEarned: c.totalGrossEarned + valorTaxaCancelamento,
+              }
+            : c
         )
       );
     }
@@ -1349,13 +1439,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cancelledAt: now,
           cancellationReason: reason,
           cancelledBy: actor,
+          taxa_cancelamento_aplicada: valorTaxaCancelamento,
+          taxa_cancelamento_repassada_piloto: aplicarTaxaCancelamento,
           statusHistory: [
             ...d.statusHistory,
             {
               status: 'cancelada',
               timestamp: now,
               actorName: actor,
-              note: `Entrega cancelada: ${reason}. Créditos de R$ ${delivery.deliveryFee.toFixed(2)} estornados.`,
+              note: aplicarTaxaCancelamento
+                ? `Corrida cancelada após deslocamento do piloto (${reason}). Taxa de cancelamento de R$ ${valorTaxaCancelamento.toFixed(2)} repassada ao piloto. Estorno líquido ao passageiro: R$ ${valorEstorno.toFixed(2)}.`
+                : `Viagem cancelada: ${reason}. Créditos de R$ ${delivery.deliveryFee.toFixed(2)} estornados integralmente.`,
             },
           ],
         };
@@ -1368,13 +1462,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actorName: actor,
       actorRole: cancelledByRole,
       actionType: 'CANCELAMENTO_ENTREGA',
-      description: `Entrega ${delivery.code} cancelada. Motivo: "${reason}". R$ ${delivery.deliveryFee.toFixed(
-        2
-      )} em créditos estornados para ${delivery.merchantName}.`,
+      description: `Viagem ${delivery.code} cancelada. Motivo: "${reason}". ${
+        aplicarTaxaCancelamento
+          ? `Taxa de R$ ${valorTaxaCancelamento.toFixed(2)} compensada ao piloto ${delivery.courierName}. Estorno ao passageiro: R$ ${valorEstorno.toFixed(2)}.`
+          : `R$ ${delivery.deliveryFee.toFixed(2)} em créditos estornados integralmente para ${delivery.merchantName}.`
+      }`,
       targetId: delivery.id,
       previousBalance: prevBal,
       newBalance: newBal,
-      details: { reason, code: delivery.code, fee: delivery.deliveryFee },
+      details: {
+        reason,
+        code: delivery.code,
+        fee: delivery.deliveryFee,
+        valorTaxaCancelamento,
+        valorEstorno,
+        courierId: delivery.courierId,
+      },
     });
 
     return { success: true };
@@ -1919,6 +2022,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // Sugestão 1.2: Favoritos com 1 Toque (Salvar e Remover Locais Favoritos)
+  const adicionarLocalFavorito = (merchantId: string, favorito: Omit<LocalFavorito, 'id'>) => {
+    const novoFavorito: LocalFavorito = {
+      ...favorito,
+      id: `fav-${Date.now()}`,
+    };
+    setMerchants((prev) =>
+      prev.map((m) =>
+        m.id === merchantId
+          ? {
+              ...m,
+              locaisFavoritos: [...(m.locaisFavoritos || []), novoFavorito],
+            }
+          : m
+      )
+    );
+    playChime();
+  };
+
+  const removerLocalFavorito = (merchantId: string, favoritoId: string) => {
+    setMerchants((prev) =>
+      prev.map((m) =>
+        m.id === merchantId
+          ? {
+              ...m,
+              locaisFavoritos: (m.locaisFavoritos || []).filter((f) => f.id !== favoritoId),
+            }
+          : m
+      )
+    );
+  };
+
   // 12. GESTÃO DE PILOTOS DE MOTO (Admin)
   const autorizarPiloto = (courierId: string, status: PilotApprovalStatus) => {
     const isApp = status === 'aprovado';
@@ -2461,6 +2596,118 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Sugestão 3.2: Broadcast / Comunicados da Central para Pilotos
+  const enviarBroadcastAlert = (
+    mensagem: string,
+    tipo: 'alerta' | 'chuva' | 'demanda' | 'urgente' = 'alerta'
+  ) => {
+    const novoAlerta: BroadcastAlert = {
+      id: `alert-${Date.now()}`,
+      mensagem,
+      tipo,
+      criado_em: new Date().toISOString(),
+      autor: session.adminName || 'Central Nexo',
+      ativo: true,
+    };
+    setBroadcastAlerts((prev) => [novoAlerta, ...prev]);
+    playChime();
+    logAudit({
+      category: 'sistema',
+      actorId: 'admin',
+      actorName: session.adminName || 'Central Nexo',
+      actorRole: 'admin',
+      actionType: 'BROADCAST_CENTRAL_ENVIADO',
+      description: `Comunicado broadcast enviado para pilotos: "${mensagem}" (${tipo})`,
+    });
+  };
+
+  const removerBroadcastAlert = (id: string) => {
+    setBroadcastAlerts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  // Sugestão 4.2: Verificação Facial Diária (Selfie do Piloto)
+  const validarSelfieDiariaPiloto = (courierId: string, fotoBase64: string) => {
+    const courier = couriers.find((c) => c.id === courierId);
+    if (!courier) return { success: false, error: 'Piloto não encontrado.' };
+
+    const now = new Date().toISOString();
+    setCouriers((prev) =>
+      prev.map((c) =>
+        c.id === courierId
+          ? {
+              ...c,
+              selfieVerificadaHoje: true,
+              ultimaSelfieVerificacaoEm: now,
+              photoUrl: fotoBase64 || c.photoUrl,
+            }
+          : c
+      )
+    );
+
+    logAudit({
+      category: 'usuario',
+      actorId: courierId,
+      actorName: courier.name,
+      actorRole: 'courier',
+      actionType: 'SELFIE_DIARIA_VALIDADA',
+      description: `Piloto ${courier.name} concluiu verificação facial diária com foto obrigatória.`,
+    });
+
+    playChime();
+    return { success: true };
+  };
+
+  // Sugestão 3.3: Registrar Rejeição e Pausa Automática por Rejeições Consecutivas
+  const registrarRejeicaoChamado = (courierId: string) => {
+    const courier = couriers.find((c) => c.id === courierId);
+    if (!courier) return;
+
+    const limiteRejeicoes = settings.limite_rejeicoes_pausa ?? 3;
+    const minutosPausa = settings.minutos_pausa_rejeicoes ?? 10;
+    const novoContador = (courier.rejeicoesConsecutivas || 0) + 1;
+
+    if (novoContador >= limiteRejeicoes) {
+      const pausaAte = new Date(Date.now() + minutosPausa * 60 * 1000).toISOString();
+      setCouriers((prev) =>
+        prev.map((c) =>
+          c.id === courierId
+            ? {
+                ...c,
+                rejeicoesConsecutivas: 0,
+                emPausaAutomaticaAte: pausaAte,
+                isOnline: false,
+                disponibilidade: 'offline',
+              }
+            : c
+        )
+      );
+
+      logAudit({
+        category: 'sistema',
+        actorId: courierId,
+        actorName: courier.name,
+        actorRole: 'courier',
+        actionType: 'PAUSA_AUTOMATICA_REJEICOES',
+        description: `Piloto ${courier.name} pausado automaticamente por ${minutosPausa} min após rejeitar ${limiteRejeicoes} chamados seguidos.`,
+      });
+    } else {
+      setCouriers((prev) =>
+        prev.map((c) =>
+          c.id === courierId ? { ...c, rejeicoesConsecutivas: novoContador } : c
+        )
+      );
+    }
+  };
+
+  // Sugestão 2.1: Meta Diária Personalizada do Piloto
+  const definirMetaDiariaPiloto = (courierId: string, metaValor: number) => {
+    setCouriers((prev) =>
+      prev.map((c) =>
+        c.id === courierId ? { ...c, metaDiariaPersonalizada: metaValor } : c
+      )
+    );
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -2484,6 +2731,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         withdrawals,
         auditLogs,
         pracas,
+        broadcastAlerts,
+        enviarBroadcastAlert,
+        removerBroadcastAlert,
+        validarSelfieDiariaPiloto,
+        registrarRejeicaoChamado,
+        definirMetaDiariaPiloto,
         soundEnabled,
         setSoundEnabled,
         playChime,
@@ -2520,6 +2773,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleComercioStatus,
         confirmarPassageiro,
         ajustarCreditoManual,
+        adicionarLocalFavorito,
+        removerLocalFavorito,
         autorizarPiloto,
         criarEntregador,
         editarEntregador,

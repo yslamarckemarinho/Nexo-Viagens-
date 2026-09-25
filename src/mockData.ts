@@ -109,6 +109,11 @@ export const INITIAL_SETTINGS: CentralSettings = {
   tarifa_dinamica_adicional: 2.00,
   // Sugestão 8: Anti-Vaga Ocupada / Inatividade na Praça
   limite_inatividade_fila_minutos: 30,
+  // Sugestões 3.3 e 5.2
+  taxa_cancelamento_tardia_valor: 2.00,
+  minutos_carencia_cancelamento: 3,
+  limite_rejeicoes_pausa: 3,
+  minutos_pausa_rejeicoes: 10,
   chave_pix_central: 'financeiro@nexoviagens.com.br',
   tipo_chave_pix_central: 'email',
   beneficiario_pix_central: 'Central Nexo Viagens • Alagoinha-PB',

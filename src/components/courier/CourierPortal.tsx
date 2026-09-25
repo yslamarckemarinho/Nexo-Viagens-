@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp, getStatusBadgeClasses, getStatusDescription } from '../../context/AppContext';
 import { Delivery, PixKeyType } from '../../types';
 import { getZoneBadgeDetails } from '../../utils/routeIntelligence';
-import { generateMapsNavigationUrl, cleanWhatsAppNumber } from '../../utils/whatsapp';
+import { generateMapsNavigationUrl, generateWazeNavigationUrl, cleanWhatsAppNumber } from '../../utils/whatsapp';
 import {
   Car,
   Power,
@@ -15,6 +15,9 @@ import {
   Sparkles,
   DollarSign,
   AlertTriangle,
+  AlertCircle,
+  Target,
+  Camera,
   Send,
   MessageSquare,
   Check,
@@ -70,6 +73,10 @@ export const CourierPortal: React.FC = () => {
     obterPosicaoFilaMototaxista,
     atualizarPracaMototaxista,
     confirmarPresencaNaFila,
+    broadcastAlerts,
+    validarSelfieDiariaPiloto,
+    registrarRejeicaoChamado,
+    definirMetaDiariaPiloto,
     logout,
   } = useApp();
 
@@ -107,6 +114,16 @@ export const CourierPortal: React.FC = () => {
   // Chat & SOS Modals
   const [showChatModal, setShowChatModal] = useState(false);
   const [showSosModal, setShowSosModal] = useState(false);
+
+  // Sugestão 2.1: Meta Diária
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [metaInput, setMetaInput] = useState<string>(String(currentCourier?.meta_diaria_reais || 100));
+
+  // Sugestão 4.2: Verificação Facial Periódica (Selfie)
+  const [showSelfieModal, setShowSelfieModal] = useState(false);
+  const [selfieSimulada, setSelfieSimulada] = useState<string>('');
+  const [selfieUploading, setSelfieUploading] = useState(false);
+  const [selfieSuccess, setSelfieSuccess] = useState(false);
 
   // Push & Geofencing states
   const [pushEnabled, setPushEnabled] = useState(
@@ -522,6 +539,73 @@ export const CourierPortal: React.FC = () => {
 
       {/* Main Container */}
       <main className="max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-5">
+        {/* COMUNICADOS / BROADCAST DA CENTRAL NEXO */}
+        {broadcastAlerts && broadcastAlerts.filter(a => a.ativo && (a.publico_alvo === 'todos' || a.publico_alvo === 'motoristas')).map(alert => (
+          <div
+            key={alert.id}
+            className={`p-4 rounded-2xl border shadow-lg space-y-1.5 ${
+              alert.nivel === 'urgente'
+                ? 'bg-rose-950/40 border-rose-500/50 text-rose-200'
+                : alert.nivel === 'alerta'
+                ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
+                : 'bg-cyan-950/40 border-cyan-500/50 text-cyan-200'
+            }`}
+          >
+            <div className="flex items-center gap-2 font-black text-sm">
+              <Bell className="w-4 h-4 shrink-0 animate-bounce" />
+              <span>[COMUNICADO CENTRAL NEXO] {alert.titulo}</span>
+            </div>
+            <p className="text-xs leading-relaxed opacity-90">{alert.mensagem}</p>
+            <span className="text-[10px] opacity-70 block">
+              Emitido por {alert.criado_por} • {new Date(alert.criado_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        ))}
+
+        {/* ALERTA DE PAUSA TEMPORÁRIA POR REJEIÇÕES CONSECUTIVAS */}
+        {currentCourier.pausa_por_rejeicoes && currentCourier.pausa_ate && new Date(currentCourier.pausa_ate).getTime() > Date.now() && (
+          <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/50 text-amber-200 text-xs space-y-1.5 shadow-lg">
+            <div className="flex items-center gap-2 text-amber-300 font-extrabold text-sm">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <span>Pausa Temporária por Rejeições Consecutivas</span>
+            </div>
+            <p>
+              Você rejeitou {currentCourier.rejeicoes_consecutivas || 3} chamados seguidos. Para não atrasar os passageiros de Alagoinha, sua conta está pausada temporariamente até as{' '}
+              <strong>{new Date(currentCourier.pausa_ate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>.
+            </p>
+          </div>
+        )}
+
+        {/* ALERTA / BOTÃO DE VERIFICAÇÃO FACIAL DIÁRIA (SELFIE) */}
+        {(!currentCourier.ultima_selfie_em ||
+          new Date().toDateString() !== new Date(currentCourier.ultima_selfie_em).toDateString() ||
+          !currentCourier.selfie_validada) && (
+          <div className="p-4 rounded-2xl bg-cyan-950/50 border border-cyan-500/50 text-cyan-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+                <Camera className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-white text-sm">Verificação Facial Diária (Segurança)</h4>
+                <p className="text-slate-400 text-xs">
+                  Tire uma selfie rápida para confirmar sua identidade na frota oficial de Alagoinha.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelfieSuccess(false);
+                setSelfieSimulada('');
+                setShowSelfieModal(true);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer shadow-md transition-all"
+            >
+              Fazer Verificação
+            </button>
+          </div>
+        )}
+
         {/* Quality Restriction Warning Banner */}
         {currentCourier.bloqueado_por_avaliacao && (
           <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs space-y-1.5 shadow-lg">
@@ -791,21 +875,32 @@ export const CourierPortal: React.FC = () => {
                     </div>
 
                     <p className="text-slate-300 text-xs">{myActiveDelivery.pickupAddress}</p>
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <a
-                        href={gerarUrlGoogleMapsRota(
-                          myActiveDelivery.currentCourierLat,
-                          myActiveDelivery.currentCourierLng,
+                        href={generateMapsNavigationUrl(
+                          myActiveDelivery.pickupAddress,
                           myActiveDelivery.origem_latitude,
-                          myActiveDelivery.origem_longitude,
-                          myActiveDelivery.pickupAddress
+                          myActiveDelivery.origem_longitude
                         )}
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
                       >
                         <Route className="w-3 h-3 text-cyan-400" />
-                        <span>GPS até Passageiro</span>
+                        <span>Google Maps</span>
+                      </a>
+                      <a
+                        href={generateWazeNavigationUrl(
+                          myActiveDelivery.pickupAddress,
+                          myActiveDelivery.origem_latitude,
+                          myActiveDelivery.origem_longitude
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                      >
+                        <Navigation className="w-3 h-3 text-sky-400" />
+                        <span>Waze</span>
                       </a>
                       {myActiveDelivery.merchantPhone && (
                         <a
@@ -815,7 +910,7 @@ export const CourierPortal: React.FC = () => {
                           className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
                         >
                           <MessageSquare className="w-3 h-3 text-cyan-400" />
-                          <span>WhatsApp do Ponto / Solicitante</span>
+                          <span>WhatsApp Solicitante</span>
                         </a>
                       )}
                     </div>
@@ -841,19 +936,30 @@ export const CourierPortal: React.FC = () => {
                     )}
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <a
-                        href={gerarUrlGoogleMapsRota(
-                          myActiveDelivery.currentCourierLat,
-                          myActiveDelivery.currentCourierLng,
+                        href={generateMapsNavigationUrl(
+                          myActiveDelivery.deliveryAddress,
                           myActiveDelivery.destino_latitude,
-                          myActiveDelivery.destino_longitude,
-                          myActiveDelivery.deliveryAddress
+                          myActiveDelivery.destino_longitude
                         )}
                         target="_blank"
                         rel="noreferrer"
                         className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
                       >
                         <Route className="w-3 h-3 text-emerald-400" />
-                        <span>Abrir Rota Destino GPS</span>
+                        <span>Google Maps</span>
+                      </a>
+                      <a
+                        href={generateWazeNavigationUrl(
+                          myActiveDelivery.deliveryAddress,
+                          myActiveDelivery.destino_latitude,
+                          myActiveDelivery.destino_longitude
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 font-semibold text-[11px] flex items-center gap-1 transition-colors"
+                      >
+                        <Navigation className="w-3 h-3 text-teal-400" />
+                        <span>Waze</span>
                       </a>
                       {myActiveDelivery.customerPhone && (
                         <a
@@ -1076,7 +1182,15 @@ export const CourierPortal: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="pt-2 flex justify-end">
+                      <div className="pt-2 flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => registrarRejeicaoChamado(currentCourier.id)}
+                          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-xs font-semibold cursor-pointer transition-all"
+                          title="Rejeitar chamado (rejeições consecutivas pausam chamados por alguns minutos)"
+                        >
+                          Recusar Chamado
+                        </button>
                         <button
                           id={`btn-accept-delivery-${delivery.id}`}
                           onClick={() => aceitarEntrega(delivery.id, currentCourier.id)}
@@ -1098,6 +1212,101 @@ export const CourierPortal: React.FC = () => {
         {/* TAB 2: GANHOS & SAQUES (EXTRATO CLARO) */}
         {activeTab === 'ganhos' && (
           <div className="space-y-6">
+            {/* NOVO: EXTRATO DIÁRIO COM META DO DIA */}
+            {(() => {
+              const metaValor = currentCourier.meta_diaria_reais || 100;
+              const percMeta = Math.min(100, Math.round((todayNet / metaValor) * 100));
+              const atingiuMeta = todayNet >= metaValor;
+              const faltaParaMeta = Math.max(0, metaValor - todayNet);
+
+              return (
+                <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/30 border border-emerald-500/30 shadow-xl space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                        <Target className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-white text-base">Meta do Dia: R$ {metaValor.toFixed(2)}</h3>
+                          {atingiuMeta && (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[10px] animate-bounce">
+                              🎉 Meta Batida!
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          {atingiuMeta
+                            ? 'Parabéns, parceiro! Você superou sua meta de hoje!'
+                            : `Faltam apenas R$ ${faltaParaMeta.toFixed(2)} líquidos para atingir seu objetivo.`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {editingMeta ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-slate-400">R$</span>
+                          <input
+                            type="number"
+                            min="20"
+                            max="1000"
+                            value={metaInput}
+                            onChange={(e) => setMetaInput(e.target.value)}
+                            className="w-20 px-2.5 py-1 rounded-xl bg-slate-950 border border-emerald-500 text-white font-bold text-xs focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = parseFloat(metaInput);
+                              if (val > 0) {
+                                definirMetaDiariaPiloto(currentCourier.id, val);
+                              }
+                              setEditingMeta(false);
+                            }}
+                            className="px-3 py-1 rounded-xl bg-emerald-400 text-slate-950 font-black text-xs cursor-pointer"
+                          >
+                            Salvar
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMetaInput(String(metaValor));
+                            setEditingMeta(true);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 text-xs font-semibold cursor-pointer transition-all"
+                        >
+                          Ajustar Meta
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Barra de Progresso da Meta */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">
+                        Progresso de hoje: <strong className="text-emerald-400 font-bold">R$ {todayNet.toFixed(2)}</strong> líquido
+                      </span>
+                      <span className="font-black text-white">{percMeta}%</span>
+                    </div>
+                    <div className="w-full h-3.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          atingiuMeta
+                            ? 'bg-gradient-to-r from-emerald-400 to-teal-300'
+                            : 'bg-gradient-to-r from-emerald-500 to-cyan-400'
+                        }`}
+                        style={{ width: `${percMeta}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Sugestão 2: Painel de Fechamento de Caixa Diário / Exportação para WhatsApp */}
             <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1543,6 +1752,95 @@ export const CourierPortal: React.FC = () => {
             );
           }}
         />
+      )}
+      {/* MODAL DE VERIFICAÇÃO FACIAL DIÁRIA (SELFIE DO PILOTO) */}
+      {showSelfieModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Verificação Facial Diária</h3>
+                  <p className="text-xs text-slate-400">Segurança da Frota Nexo Alagoinha</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSelfieModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {selfieSuccess ? (
+              <div className="p-5 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-center space-y-2">
+                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+                <h4 className="font-black text-sm">Selfie Validada com Sucesso!</h4>
+                <p className="text-xs text-slate-300">
+                  Sua identidade foi verificada. Você está 100% liberado para atender passageiros hoje.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                <p className="text-slate-300 leading-relaxed">
+                  Para a segurança dos passageiros de Alagoinha, periodicamente pedimos uma selfie com o capacete levantado para confirmar que você mesmo está pilotando.
+                </p>
+
+                <div className="w-full h-48 bg-slate-950 rounded-2xl border-2 border-dashed border-cyan-500/40 flex flex-col items-center justify-center p-4 text-center space-y-2">
+                  {selfieSimulada ? (
+                    <img
+                      src={selfieSimulada}
+                      alt="Selfie"
+                      className="w-32 h-32 rounded-full object-cover border-2 border-emerald-400 shadow-md"
+                    />
+                  ) : (
+                    <>
+                      <Camera className="w-10 h-10 text-cyan-400 animate-pulse" />
+                      <span className="text-slate-400 text-xs">Câmera frontal posicionada no rosto</span>
+                      <span className="text-[10px] text-slate-500">Mantenha boa iluminação e rosto descoberto</span>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Simular captura de selfie
+                      setSelfieSimulada('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80');
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer"
+                  >
+                    Simular Captura de Foto
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={selfieUploading}
+                    onClick={() => {
+                      setSelfieUploading(true);
+                      setTimeout(() => {
+                        validarSelfieDiariaPiloto(currentCourier.id);
+                        setSelfieUploading(false);
+                        setSelfieSuccess(true);
+                        setTimeout(() => {
+                          setShowSelfieModal(false);
+                        }, 1800);
+                      }, 1200);
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-black cursor-pointer shadow-lg shadow-cyan-500/20"
+                  >
+                    {selfieUploading ? 'Validando...' : 'Confirmar e Enviar'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
