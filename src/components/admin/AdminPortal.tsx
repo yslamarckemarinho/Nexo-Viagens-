@@ -41,12 +41,13 @@ type AdminTab =
   | 'configuracoes';
 
 export const AdminPortal: React.FC = () => {
-  const { logout, recharges, withdrawals, deliveries, couriers, pracas, settings, toggleTarifaDinamica } = useApp();
+  const { logout, merchants, recharges, withdrawals, deliveries, couriers, pracas, settings, toggleTarifaDinamica } = useApp();
   const [currentTab, setCurrentTab] = useState<AdminTab>('dashboard');
 
   const pendingRechargesCount = recharges.filter((r) => r.status === 'pendente').length;
   const pendingWithdrawalsCount = withdrawals.filter((w) => w.status === 'aguardando_pagamento').length;
   const pendingPilotsCount = couriers.filter((c) => c.approvalStatus === 'pendente').length;
+  const pendingPassengersCount = merchants.filter((m) => m.status_cadastro === 'pendente').length;
   const activeDeliveriesCount = deliveries.filter(
     (d) => d.status !== 'concluida' && d.status !== 'cancelada'
   ).length;
@@ -101,6 +102,17 @@ export const AdminPortal: React.FC = () => {
               >
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
                 <span>{pendingPilotsCount} {pendingPilotsCount === 1 ? 'Motorista Pendente' : 'Motoristas Pendentes'}</span>
+              </button>
+            )}
+
+            {pendingPassengersCount > 0 && (
+              <button
+                onClick={() => setCurrentTab('comercios')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 text-xs font-bold animate-pulse cursor-pointer"
+                title="Passageiros aguardando confirmação"
+              >
+                <Users className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{pendingPassengersCount} {pendingPassengersCount === 1 ? 'Novo Passageiro' : 'Novos Passageiros'}</span>
               </button>
             )}
 
@@ -209,7 +221,7 @@ export const AdminPortal: React.FC = () => {
           <button
             id="tab-btn-comercios"
             onClick={() => setCurrentTab('comercios')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
               currentTab === 'comercios'
                 ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -217,6 +229,15 @@ export const AdminPortal: React.FC = () => {
           >
             <Users className="w-4 h-4" />
             <span>Passageiros</span>
+            {pendingPassengersCount > 0 && (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  currentTab === 'comercios' ? 'bg-slate-950 text-cyan-400' : 'bg-cyan-400 text-slate-950'
+                }`}
+              >
+                {pendingPassengersCount} novo{pendingPassengersCount > 1 ? 's' : ''}
+              </span>
+            )}
           </button>
 
           <button

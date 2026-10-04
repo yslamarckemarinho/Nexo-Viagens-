@@ -38,6 +38,7 @@ import {
 } from '../mockData';
 import { getSupabase, isSupabaseConfigured, throttleAction } from '../lib/supabase';
 import { calcularDistanciaMetros, estimarTempoChegadaMinutos } from '../utils/geofencing';
+import { calcularTarifaOficial } from '../utils/pricingEngine';
 
 interface AppContextType {
   // Session & Authentication
@@ -407,6 +408,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!errPracas && pracasDb && pracasDb.length > 0) {
           setPracas(pracasDb as any);
         }
+
+        // Carrega mototaxistas da nuvem
+        const { data: mototaxistasDb, error: errMotos } = await supabase
+          .from('mototaxistas')
+          .select('*');
+
+        if (!errMotos && mototaxistasDb && mototaxistasDb.length > 0) {
+          setCouriers((prev) => {
+            const map = new Map<string, any>();
+            prev.forEach((c) => map.set(c.id, c));
+            mototaxistasDb.forEach((m: any) => {
+              const id = m.id || m.perfil_id;
+              map.set(id, {
+                ...(map.get(id) || {}),
+                ...m,
+                id,
+                name: m.nome || m.name || (map.get(id)?.name ?? 'Motorista'),
+                phone: m.telefone || m.phone || (map.get(id)?.phone ?? ''),
+                vehiclePlate: m.placa_veiculo || m.vehiclePlate,
+                approvalStatus: m.status_aprovacao || m.approvalStatus || 'pendente',
+                isApproved: m.status_aprovacao === 'aprovado' || m.isApproved === true,
+              });
+            });
+            return Array.from(map.values());
+          });
+        }
+
+        // Carrega passageiros da nuvem (perfis)
+        const { data: perfisDb, error: errPerfis } = await supabase
+          .from('perfis')
+          .select('*');
+
+        if (!errPerfis && perfisDb && perfisDb.length > 0) {
+          const passageirosDb = perfisDb.filter((p: any) => p.tipo === 'passageiro' || !p.tipo);
+          if (passageirosDb.length > 0) {
+            setMerchants((prev) => {
+              const map = new Map<string, any>();
+              prev.forEach((m) => map.set(m.id, m));
+              passageirosDb.forEach((p: any) => {
+                map.set(p.id, {
+                  ...(map.get(p.id) || {}),
+                  ...p,
+                  id: p.id,
+                  name: p.nome || p.name || (map.get(p.id)?.name ?? 'Passageiro'),
+                  phone: p.telefone || p.phone || (map.get(p.id)?.phone ?? ''),
+                  creditBalance: p.saldo_creditos ?? p.creditBalance ?? 0,
+                  active: p.ativo ?? p.active ?? true,
+                  status_cadastro: p.status_cadastro || 'confirmado',
+                });
+              });
+              return Array.from(map.values());
+            });
+          }
+        }
       } catch (e) {
         console.warn('Sincronização inicial com Supabase:', e);
       }
@@ -437,11 +492,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         { event: '*', schema: 'public', table: 'mototaxistas' },
         (payload) => {
           throttleAction('rt_mototaxistas', 500, () => {
-            if (payload.eventType === 'UPDATE') {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
               const moto = payload.new as any;
+              setCouriers((prev) => {
+                const existing = prev.some((c) => c.id === moto.id || c.perfil_id === moto.perfil_id);
+                if (!existing) {
+                  return [
+                    {
+                      ...moto,
+                      id: moto.id || moto.perfil_id,
+                      name: moto.nome || moto.name || 'Motorista',
+                      phone: moto.telefone || moto.phone || '',
+                      vehiclePlate: moto.placa_veiculo || moto.vehiclePlate,
+                      approvalStatus: moto.status_aprovacao || 'pendente',
+                      isApproved: moto.status_aprovacao === 'aprovado',
+                      isOnline: moto.disponibilidade !== 'offline',
+                    },
+                    ...prev,
+                  ];
+                }
+                return prev.map((c) =>
+                  c.id === moto.id || c.perfil_id === moto.perfil_id
+                    ? {
+                        ...c,
+                        ...moto,
+                        name: moto.nome || moto.name || c.name,
+                        phone: moto.telefone || moto.phone || c.phone,
+                        vehiclePlate: moto.placa_veiculo || moto.vehiclePlate || c.vehiclePlate,
+                        approvalStatus: moto.status_aprovacao || c.approvalStatus,
+                        isApproved: moto.status_aprovacao === 'aprovado' || c.isApproved,
+                      }
+                    : c
+                );
+              });
+            }
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'perfis' },
+        (payload) => {
+          throttleAction('rt_perfis', 500, () => {
+            const perfil = payload.new as any;
+            if (perfil.tipo === 'mototaxista') {
               setCouriers((prev) =>
-                prev.map((c) => (c.id === moto.id || c.perfil_id === moto.perfil_id ? { ...c, ...moto } : c))
+                prev.map((c) =>
+                  c.id === perfil.id || c.perfil_id === perfil.id
+                    ? { ...c, name: perfil.nome || c.name, phone: perfil.telefone || c.phone }
+                    : c
+                )
               );
+            } else {
+              setMerchants((prev) => {
+                const exists = prev.some((m) => m.id === perfil.id);
+                if (!exists) {
+                  return [
+                    {
+                      id: perfil.id,
+                      name: perfil.nome || 'Novo Passageiro',
+                      ownerName: perfil.nome || 'Novo Passageiro',
+                      phone: perfil.telefone || '',
+                      address: 'Centro, Alagoinha-PB',
+                      creditBalance: perfil.saldo_creditos || 0,
+                      totalSpent: 0,
+                      totalDeliveries: 0,
+                      active: perfil.ativo ?? true,
+                      status_cadastro: perfil.status_cadastro || 'confirmado',
+                      createdAt: perfil.created_at || new Date().toISOString(),
+                    },
+                    ...prev,
+                  ];
+                }
+                return prev.map((m) =>
+                  m.id === perfil.id
+                    ? {
+                        ...m,
+                        name: perfil.nome || m.name,
+                        phone: perfil.telefone || m.phone,
+                        creditBalance: perfil.saldo_creditos ?? m.creditBalance,
+                        active: perfil.ativo ?? m.active,
+                      }
+                    : m
+                );
+              });
             }
           });
         }
@@ -461,6 +595,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       )
+      // 📡 Sincronização Broadcast em Tempo Real entre Aparelhos (Novo Passageiro / Novo Piloto)
+      .on('broadcast', { event: 'novo_cadastro_passageiro' }, ({ payload }) => {
+        if (!payload || !payload.id) return;
+        setMerchants((prev) => {
+          if (prev.some((m) => m.id === payload.id)) {
+            return prev.map((m) => (m.id === payload.id ? { ...m, ...payload } : m));
+          }
+          return [payload, ...prev];
+        });
+        playChime();
+      })
+      .on('broadcast', { event: 'novo_cadastro_piloto' }, ({ payload }) => {
+        if (!payload || !payload.id) return;
+        setCouriers((prev) => {
+          if (prev.some((c) => c.id === payload.id)) {
+            return prev.map((c) => (c.id === payload.id ? { ...c, ...payload } : c));
+          }
+          return [payload, ...prev];
+        });
+        playChime();
+      })
       // 📡 CANAL EFÊMERO P2P (BROADCAST): Sincroniza GPS do piloto com o passageiro em tempo real sem gravar no banco
       .on('broadcast', { event: 'telemetria_gps' }, ({ payload }) => {
         if (!payload || !payload.deliveryId) return;
@@ -718,6 +873,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setMerchants((prev) => [newMerchant, ...prev]);
 
+    // Persistência na nuvem Supabase e transmissão Realtime para a Central
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        // Grava na tabela 'perfis'
+        supabase
+          .from('perfis')
+          .insert([
+            {
+              id: newMerchant.id,
+              tipo: 'passageiro',
+              nome: newMerchant.name,
+              telefone: newMerchant.phone,
+              saldo_creditos: newMerchant.creditBalance,
+              ativo: true,
+              created_at: newMerchant.createdAt,
+            },
+          ])
+          .then(({ error }) => {
+            if (error) console.warn('Supabase salvar passageiro:', error);
+          });
+
+        // Dispara broadcast em tempo real para os outros aparelhos (inclusive celular do Admin)
+        supabase.channel('nexo-realtime-canal').send({
+          type: 'broadcast',
+          event: 'novo_cadastro_passageiro',
+          payload: newMerchant,
+        });
+      }
+    } catch (e) {
+      console.warn('Erro ao sincronizar passageiro na nuvem:', e);
+    }
+
     // Auto-login imediato do passageiro para a experiência sem atrito do Uber
     const newSession: UserSession = {
       role: 'merchant',
@@ -772,6 +960,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setCouriers((prev) => [newCourier, ...prev]);
+
+    // Persistência na nuvem Supabase e transmissão Realtime para a Central
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        supabase
+          .from('mototaxistas')
+          .insert([
+            {
+              id: newCourier.id,
+              nome: newCourier.name,
+              telefone: newCourier.phone,
+              cpf: newCourier.cpf,
+              placa_veiculo: newCourier.vehiclePlate,
+              status_aprovacao: 'pendente',
+              disponibilidade: 'offline',
+              praca_atual_id: newCourier.assignedZoneId,
+              created_at: newCourier.createdAt,
+            },
+          ])
+          .then(({ error }) => {
+            if (error) console.warn('Supabase salvar mototaxista:', error);
+          });
+
+        // Dispara broadcast em tempo real para os outros aparelhos
+        supabase.channel('nexo-realtime-canal').send({
+          type: 'broadcast',
+          event: 'novo_cadastro_piloto',
+          payload: newCourier,
+        });
+      }
+    } catch (e) {
+      console.warn('Erro ao sincronizar mototaxista na nuvem:', e);
+    }
 
     // Auto login
     const newSession: UserSession = {
@@ -857,10 +1079,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const paymentMethodType = 'saldo_credito';
-    const effectiveFee = Math.max(0, params.deliveryFee);
+
+    // O SISTEMA DECIDE O VALOR DA CORRIDA AUTOMATICAMENTE (O passageiro não manipula preço)
+    const tarifaCalculada = calcularTarifaOficial({
+      origemTexto: params.pickupAddress,
+      destinoTexto: params.deliveryAddress,
+      origemCoords: params.origemLatitude && params.origemLongitude ? { lat: params.origemLatitude, lng: params.origemLongitude } : null,
+      destinoCoords: params.destinoLatitude && params.destinoLongitude ? { lat: params.destinoLatitude, lng: params.destinoLongitude } : null,
+      tarifaDinamicaAtiva: settings.tarifa_dinamica_ativa,
+      tarifaDinamicaAdicional: settings.tarifa_dinamica_adicional,
+      tarifaBaseConfig: settings.tarifa_base_corrida || 4.0,
+    });
+
+    const effectiveFee = tarifaCalculada.valorFinal;
 
     if (effectiveFee <= 0) {
-      return { success: false, error: 'O valor da corrida de moto deve ser maior que R$ 0,00.' };
+      return { success: false, error: 'Não foi possível calcular a tarifa oficial desta rota.' };
     }
 
     // A Nexo opera EXCLUSIVAMENTE via créditos arrecadados previamente pela Central
@@ -909,8 +1143,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       terceiro_nome: params.terceiroNome?.trim() || undefined,
       terceiro_telefone: params.terceiroTelefone?.trim() || undefined,
       itemDescription: params.itemDescription?.trim() || undefined,
-      pracaZoneId: params.pracaZoneId || 'praca_1_centro',
-      pracaZoneName: params.pracaZoneName || 'Ponto 1 - Centro',
+      pracaZoneId: params.pracaZoneId || (tarifaCalculada.categoriaZona === 'rural' ? 'praca_3_rural' : 'praca_1_centro'),
+      pracaZoneName: tarifaCalculada.nomeZona,
       vehicleType: 'moto',
       paymentMethodType: 'saldo_credito',
       merchantId: merchant.id,
@@ -927,10 +1161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deliveryAddress: params.deliveryAddress.trim(),
       destino_latitude: params.destinoLatitude,
       destino_longitude: params.destinoLongitude,
-      distancia_estimada_km:
-        params.origemLatitude && params.origemLongitude && params.destinoLatitude && params.destinoLongitude
-          ? Number((calcularDistanciaMetros(params.origemLatitude, params.origemLongitude, params.destinoLatitude, params.destinoLongitude) / 1000).toFixed(2))
-          : undefined,
+      distancia_estimada_km: Number((tarifaCalculada.distanciaEstimadaMetros / 1000).toFixed(2)),
       gpsLoopActive: true,
       deliveryNeighborhood: params.deliveryNeighborhood?.trim() || undefined,
       customerName: params.customerName?.trim() || merchant.name,
@@ -938,7 +1169,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deliveryFee: effectiveFee,
       courierEarnings,
       centralFee,
-      zoneType: params.zoneType || (params.isRural ? 'rural' : 'urbana_central'),
+      zoneType: tarifaCalculada.categoriaZona,
       zoneLabel: params.zoneLabel,
       zoneReason: params.zoneReason,
       isRural: params.isRural || false,
@@ -2070,6 +2301,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
+    // Sincroniza aprovação no Supabase
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        supabase
+          .from('perfis')
+          .update({
+            ativo: true,
+            status_cadastro: 'confirmado',
+          })
+          .eq('id', merchantId)
+          .then(() => {});
+      }
+    } catch {}
+
     const pass = merchants.find((m) => m.id === merchantId);
     logAudit({
       category: 'usuario',
@@ -2163,6 +2409,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return c;
       })
     );
+
+    // Sincroniza no Supabase
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        supabase
+          .from('mototaxistas')
+          .update({
+            status_aprovacao: status,
+            disponibilidade: isApp ? 'disponivel' : 'offline',
+          })
+          .eq('id', courierId)
+          .then(() => {});
+      }
+    } catch {}
 
     const pilot = couriers.find((c) => c.id === courierId);
     logAudit({

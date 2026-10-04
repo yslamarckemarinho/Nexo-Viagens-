@@ -60,6 +60,7 @@ import { RideSosModal } from '../common/RideSosModal';
 import { GpsPermissionModal } from '../common/GpsPermissionModal';
 import { PWAInstallBanner } from '../common/PWAInstallBanner';
 import { RouteNavigationMap } from '../courier/RouteNavigationMap';
+import { calcularTarifaOficial, ResultadoTarifa } from '../../utils/pricingEngine';
 import {
   identificarPontoAlagoinhaPorCoords,
   gerarUrlGoogleMapsRota,
@@ -206,13 +207,41 @@ export const MerchantPortal: React.FC = () => {
   // Selected Zone object
   const currentZone = DEFAULT_OPERATING_ZONES.find((z) => z.id === selectedPracaId) || DEFAULT_OPERATING_ZONES[0];
 
-  // Adjust fee when praça changes (urban only) and apply dynamic tariff if active
+  // Cálculo Automático de Tarifa pelo Sistema (O Passageiro Não Escolhe o Preço)
+  const [detalheTarifa, setDetalheTarifa] = useState<ResultadoTarifa>(() =>
+    calcularTarifaOficial({
+      origemTexto: pickupAddress,
+      destinoTexto: deliveryAddress,
+      origemCoords: gpsOriginCoords,
+      destinoCoords: gpsDestCoords,
+      tarifaDinamicaAtiva: settings.tarifa_dinamica_ativa,
+      tarifaDinamicaAdicional: settings.tarifa_dinamica_adicional,
+      tarifaBaseConfig: settings.tarifa_base_corrida || 4.0,
+    })
+  );
+
+  // Recalcula automaticamente sempre que o local de embarque, destino ou bandeira especial mudar
   useEffect(() => {
-    const found = DEFAULT_OPERATING_ZONES.find((z) => z.id === selectedPracaId);
-    const baseFee = found ? found.standardFee : feeCentral;
-    const additional = settings.tarifa_dinamica_ativa ? (settings.tarifa_dinamica_adicional ?? 2.0) : 0;
-    setDeliveryFee(baseFee + additional);
-  }, [selectedPracaId, feeCentral, feeDistante, settings.tarifa_dinamica_ativa, settings.tarifa_dinamica_adicional]);
+    const calc = calcularTarifaOficial({
+      origemTexto: pickupAddress,
+      destinoTexto: deliveryAddress,
+      origemCoords: gpsOriginCoords,
+      destinoCoords: gpsDestCoords,
+      tarifaDinamicaAtiva: settings.tarifa_dinamica_ativa,
+      tarifaDinamicaAdicional: settings.tarifa_dinamica_adicional,
+      tarifaBaseConfig: settings.tarifa_base_corrida || 4.0,
+    });
+    setDetalheTarifa(calc);
+    setDeliveryFee(calc.valorFinal);
+  }, [
+    pickupAddress,
+    deliveryAddress,
+    gpsOriginCoords,
+    gpsDestCoords,
+    settings.tarifa_dinamica_ativa,
+    settings.tarifa_dinamica_adicional,
+    settings.tarifa_base_corrida,
+  ]);
 
   if (!currentMerchant) {
     return (
@@ -736,31 +765,34 @@ export const MerchantPortal: React.FC = () => {
                   {/* Sugestões de Destinos Frequentes / Rápidos modelo Uber */}
                   <div>
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                      Destinos Populares em Alagoinha:
+                      Destinos Populares em Alagoinha (Tarifas Oficiais do Sistema):
                     </span>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
-                        { title: 'Centro Comercial', sub: 'Praça Central', fee: feeCentral },
-                        { title: 'Igreja Matriz', sub: 'Centro', fee: feeCentral },
-                        { title: 'Pátio de Eventos', sub: 'Área de Lazer', fee: feeCentral },
-                        { title: 'Bairro São José', sub: 'Zona Residencial', fee: feeCentral },
-                        { title: 'Rua Nova', sub: 'Zona Urbana', fee: feeCentral },
-                        { title: 'Bairro Boa Vista', sub: 'Zona Alta', fee: feeDistante },
-                        { title: 'Conjunto Novo', sub: 'Zona Sul', fee: feeDistante },
-                        { title: 'Zona Rural / Sítio', sub: 'Sob Consulta', fee: settings.feeRural || 15 },
+                        { title: 'Centro Comercial', sub: 'Praça Central', fee: 4.0 },
+                        { title: 'Igreja Matriz', sub: 'Centro', fee: 4.0 },
+                        { title: 'Pátio de Eventos', sub: 'Área de Lazer', fee: 5.0 },
+                        { title: 'Bairro São José', sub: 'Zona Residencial', fee: 5.0 },
+                        { title: 'Rua Nova', sub: 'Zona Urbana', fee: 4.0 },
+                        { title: 'Bairro Boa Vista', sub: 'Zona Alta', fee: 5.0 },
+                        { title: 'Conjunto Novo', sub: 'Zona Sul', fee: 5.0 },
+                        { title: 'Sítio Maguary', sub: 'Zona Rural', fee: 12.0 },
                       ].map((item) => (
                         <button
                           key={item.title}
                           type="button"
                           onClick={() => {
                             setDeliveryAddress(item.title);
+                            handleSelectDestinoAtalho(item.title);
                             setShowNewRideModal(true);
                           }}
                           className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 text-left transition-all cursor-pointer group"
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm">📍</span>
-                            <span className="text-[10px] font-bold text-cyan-400">R$ {item.fee.toFixed(2)}</span>
+                            <span className="text-[10px] font-bold text-cyan-400">
+                              R$ {(item.fee + (settings.tarifa_dinamica_ativa ? (settings.tarifa_dinamica_adicional ?? 2) : 0)).toFixed(2)}
+                            </span>
                           </div>
                           <span className="text-xs font-bold text-white group-hover:text-cyan-300 block truncate">
                             {item.title}
@@ -1326,37 +1358,47 @@ export const MerchantPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* PONTO DE REFERÊNCIA / ZONA */}
-            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+            {/* PONTO DE REFERÊNCIA / ZONA AUTOMATIZADA PELO SISTEMA */}
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-cyan-500/30 space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-cyan-300">
-                  Ponto de Referência / Região da Viagem *
-                </label>
-                <span className="text-[10px] text-slate-400">Atendimento por zona</span>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+                  <label className="block text-xs font-black text-cyan-300">
+                    Cálculo Oficial da Viagem (Definido pelo Sistema)
+                  </label>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
+                  Tarifador Automático
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {DEFAULT_OPERATING_ZONES.map((zone) => (
-                  <button
-                    key={zone.id}
-                    type="button"
-                    onClick={() => setSelectedPracaId(zone.id)}
-                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      selectedPracaId === zone.id
-                        ? 'bg-cyan-500/20 border-cyan-400 text-white ring-1 ring-cyan-400'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <span className="text-xs font-bold block text-white truncate">{zone.name}</span>
-                    <span className="text-[10px] text-cyan-400 font-medium block mt-0.5">
-                      Tarifa: R$ {zone.standardFee.toFixed(2)}
+              {/* Card de Tarifação do Sistema */}
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-white flex items-center gap-1.5">
+                      <span>🏷️ {detalheTarifa.nomeZona}</span>
                     </span>
-                  </button>
-                ))}
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {detalheTarifa.motivoExplicativo}
+                    </p>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] text-slate-400 block font-semibold uppercase">Valor Oficial:</span>
+                    <span className="text-xl font-black text-cyan-400">
+                      R$ {detalheTarifa.valorFinal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {detalheTarifa.adicionalDinamica > 0 && (
+                  <div className="p-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-between text-[10px] text-blue-200">
+                    <span>🌧️ Bandeira Chuva/Eventos inclusa:</span>
+                    <span className="font-bold">+ R$ {detalheTarifa.adicionalDinamica.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
-              <p className="text-[11px] text-slate-400">
-                {currentZone.description}
-              </p>
             </div>
 
             {/* Se Encomenda: Descrição do Item */}
@@ -1656,14 +1698,19 @@ export const MerchantPortal: React.FC = () => {
             </div>
 
             {/* Summary Banner */}
-            <div className="p-3 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-cyan-300 font-bold block">{currentZone.name}</span>
-                <span className="text-[11px] text-slate-400">Veículo: Motorista Credenciado Nexo Viagens</span>
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-cyan-500/40 flex items-center justify-between text-xs">
+              <div className="space-y-0.5">
+                <span className="text-cyan-300 font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Tarifa Fixada pelo Sistema Nexo: {detalheTarifa.nomeZona}</span>
+                </span>
+                <span className="text-[11px] text-slate-400 block">
+                  Distância estimada: ~{(detalheTarifa.distanciaEstimadaMetros / 1000).toFixed(1)} km • Repasse 100% auditado
+                </span>
               </div>
               <div className="text-right">
-                <span className="text-slate-400 text-[10px] block">Valor Total:</span>
-                <span className="text-base font-black text-cyan-400">R$ {deliveryFee.toFixed(2)}</span>
+                <span className="text-slate-400 text-[10px] block uppercase font-bold">Valor Oficial:</span>
+                <span className="text-lg font-black text-cyan-400">R$ {deliveryFee.toFixed(2)}</span>
               </div>
             </div>
 
