@@ -57,6 +57,9 @@ import {
 } from '../../utils/whatsapp';
 import { RideChatModal } from '../common/RideChatModal';
 import { RideSosModal } from '../common/RideSosModal';
+import { GpsPermissionModal } from '../common/GpsPermissionModal';
+import { PWAInstallBanner } from '../common/PWAInstallBanner';
+import { RouteNavigationMap } from '../courier/RouteNavigationMap';
 import {
   identificarPontoAlagoinhaPorCoords,
   gerarUrlGoogleMapsRota,
@@ -390,6 +393,25 @@ export const MerchantPortal: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6 selection:bg-cyan-500 selection:text-slate-950">
+      {/* Modal Amigável de Solicitação de GPS */}
+      <GpsPermissionModal
+        tipoUsuario="passageiro"
+        onPermitido={(coords) => {
+          const ponto = identificarPontoAlagoinhaPorCoords(coords.lat, coords.lng);
+          const endereco = ponto.descricaoSugerida || 'Localização Atual via GPS';
+          setPickupAddress(endereco);
+          setGpsOriginCoords({
+            lat: coords.lat,
+            lng: coords.lng,
+            accuracy: Math.round(coords.accuracy),
+            label: ponto.pontoMaisProximo?.nome || endereco,
+          });
+        }}
+      />
+
+      {/* Banner de Instalação do App PWA */}
+      <PWAInstallBanner />
+
       {/* Sugestão 7: Alerta de Bandeira Especial / Tarifa Dinâmica Ativa */}
       {settings.tarifa_dinamica_ativa && (
         <div className="p-4 rounded-2xl bg-blue-500/15 border border-blue-500/40 text-blue-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
@@ -837,6 +859,18 @@ export const MerchantPortal: React.FC = () => {
                           {delivery.pinCode}
                         </span>
                       </div>
+                    )}
+
+                    {/* 🗺️ O GUIA AZUL COM RASTREIO DA MOTO E ROTA EM TEMPO REAL PARA O PASSAGEIRO */}
+                    {hasCourier && (
+                      <RouteNavigationMap
+                        delivery={delivery}
+                        courierLat={delivery.currentCourierLat}
+                        courierLng={delivery.currentCourierLng}
+                        courierHeading={delivery.currentCourierHeading}
+                        courierSpeed={delivery.currentCourierSpeed}
+                        readOnly={true}
+                      />
                     )}
 
                     {/* 📡 Radar de Telemetria GPS Inteligente (Atualizado a cada 15 segundos) */}

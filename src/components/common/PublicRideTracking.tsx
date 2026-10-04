@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Delivery } from '../../types';
 import { NexoLogo } from './NexoLogo';
+import { RouteNavigationMap } from '../courier/RouteNavigationMap';
 
 interface PublicRideTrackingProps {
   delivery: Delivery | null | undefined;
@@ -155,6 +156,18 @@ export const PublicRideTracking: React.FC<PublicRideTrackingProps> = ({
             </div>
           </div>
         </div>
+
+        {/* 🗺️ MINI-MAPA COM O GUIA AZUL EM TEMPO REAL PARA O PASSAGEIRO E FAMÍLIA */}
+        {isActive && (
+          <RouteNavigationMap
+            delivery={delivery}
+            courierLat={delivery.currentCourierLat}
+            courierLng={delivery.currentCourierLng}
+            courierHeading={delivery.currentCourierHeading}
+            courierSpeed={delivery.currentCourierSpeed}
+            readOnly={true}
+          />
+        )}
 
         {/* Pilot Credential Card */}
         {delivery.courierId && (

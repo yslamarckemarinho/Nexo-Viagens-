@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { NexoLogo } from '../common/NexoLogo';
+import { PWAInstallBanner } from '../common/PWAInstallBanner';
 import {
   Car,
   ShieldCheck,
@@ -39,6 +40,7 @@ export const PortalSelectScreen: React.FC<PortalSelectScreenProps> = ({ onSelect
           />
           
           <div className="flex items-center gap-2">
+            <PWAInstallBanner compact={true} />
             <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-500/30">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               Operação Ativa • {settings.city}
@@ -48,7 +50,10 @@ export const PortalSelectScreen: React.FC<PortalSelectScreenProps> = ({ onSelect
       </header>
 
       {/* Main Content Area */}
-      <main className="relative z-10 max-w-5xl mx-auto px-4 py-8 sm:py-12 w-full flex-1 flex flex-col justify-center">
+      <main className="relative z-10 max-w-5xl mx-auto px-4 py-8 sm:py-12 w-full flex-1 flex flex-col justify-center space-y-6">
+        {/* Banner de Instalação PWA */}
+        <PWAInstallBanner />
+
         {/* Welcome Tagline */}
         <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/30 mb-3 shadow-inner">

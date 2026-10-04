@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "Nexo Viagens Alagoinha",
+  "short_name": "NexoViagens",
+  "description": "Aplicativo de mobilidade urbana e viagens com mototaxistas credenciados de Alagoinha-PB.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#0284c7",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["travel", "navigation", "transportation"],
+  "lang": "pt-BR"
+}

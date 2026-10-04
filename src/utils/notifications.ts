@@ -98,3 +98,32 @@ export function tocarAlertaSos() {
     console.warn('Alerta sonoro SOS não reproduzido:', e);
   }
 }
+
+// Chime melódico harmonioso para detecção automática de chegada (embarque/destino)
+export function tocarChimeChegada() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+
+    const notas = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6 (Acorde Maior de Sucesso)
+    notas.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.1);
+
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + idx * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.1 + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime + idx * 0.1);
+      osc.stop(ctx.currentTime + idx * 0.1 + 0.4);
+    });
+  } catch (e) {
+    console.warn('Chime de chegada não pôde ser reproduzido:', e);
+  }
+}

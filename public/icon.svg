@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="50%" stop-color="#0369a1" />
+      <stop offset="100%" stop-color="#0b1329" />
+    </linearGradient>
+    <linearGradient id="neonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#00E5FF" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  
+  <!-- Fundo Circular com Safe Zone para PWA Maskable -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+  
+  <!-- Círculo Central Safe Zone (80%) -->
+  <circle cx="256" cy="256" r="180" fill="#0f172a" stroke="#00E5FF" stroke-width="4" stroke-opacity="0.4" />
+  
+  <!-- Ícone de Moto Estilizada / Mobilidade em Neon -->
+  <g filter="url(#glow)">
+    <!-- Roda Traseira -->
+    <circle cx="160" cy="300" r="48" fill="none" stroke="url(#neonGrad)" stroke-width="14" />
+    <circle cx="160" cy="300" r="16" fill="#00E5FF" />
+    
+    <!-- Roda Dianteira -->
+    <circle cx="352" cy="300" r="48" fill="none" stroke="url(#neonGrad)" stroke-width="14" />
+    <circle cx="352" cy="300" r="16" fill="#00E5FF" />
+    
+    <!-- Chassi & Guidão da Moto -->
+    <path d="M 160 300 L 235 250 L 310 250 L 352 300" fill="none" stroke="url(#neonGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 235 250 L 260 180 L 320 180" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 220 220 L 270 220" fill="none" stroke="#38BDF8" stroke-width="10" stroke-linecap="round" />
+    
+    <!-- Farol Dianteiro com Feixe de Luz -->
+    <polygon points="330,175 390,160 390,195" fill="#00E5FF" opacity="0.75" />
+    <circle cx="325" cy="177" r="10" fill="#FFFFFF" />
+  </g>
+  
+  <!-- Texto NEXO VIAGENS -->
+  <text x="256" y="410" text-anchor="middle" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="34" letter-spacing="4">NEXO</text>
+  <text x="256" y="440" text-anchor="middle" fill="#00E5FF" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="16" letter-spacing="3">VIAGENS • ALAGOINHA</text>
+</svg>

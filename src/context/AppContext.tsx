@@ -23,6 +23,8 @@ import {
   StatusAprovacaoMototaxista,
   TipoUsuario,
   MensagemChat,
+  BroadcastAlert,
+  LocalFavorito,
 } from '../types';
 import {
   INITIAL_SETTINGS,
@@ -182,7 +184,8 @@ interface AppContextType {
   ) => void;
 
   aceitarEntrega: (deliveryId: string, courierId: string) => { success: boolean; error?: string };
-  avancarStatusEntrega: (deliveryId: string, actorName?: string, pinInput?: string) => { success: boolean; error?: string };
+  avancarStatusEntrega: (deliveryId: string, actorName?: string, pinInput?: string, targetStatus?: DeliveryStatus) => { success: boolean; error?: string };
+  notificarChegadaPiloto: (deliveryId: string) => { success: boolean; error?: string };
   confirmarRetornoDinheiroEntregador: (deliveryId: string) => { success: boolean; error?: string };
   confirmarRecebimentoDinheiroComercio: (deliveryId: string) => { success: boolean; error?: string };
   cancelarEntrega: (deliveryId: string, reason: string, cancelledByRole: UserRole) => { success: boolean; error?: string };
@@ -458,6 +461,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       )
+      // 📡 CANAL EFÊMERO P2P (BROADCAST): Sincroniza GPS do piloto com o passageiro em tempo real sem gravar no banco
+      .on('broadcast', { event: 'telemetria_gps' }, ({ payload }) => {
+        if (!payload || !payload.deliveryId) return;
+        setDeliveries((prev) =>
+          prev.map((d) => {
+            if (d.id !== payload.deliveryId) return d;
+            return {
+              ...d,
+              currentCourierLat: payload.courierLat ?? d.currentCourierLat,
+              currentCourierLng: payload.courierLng ?? d.currentCourierLng,
+              currentCourierHeading: payload.heading ?? d.currentCourierHeading,
+              currentCourierSpeed: payload.speed ?? d.currentCourierSpeed,
+              distanceToPassengerMeters: payload.distanciaMetros ?? d.distanceToPassengerMeters,
+              distanceToDestinationMeters: payload.distanciaDestinoMetros ?? d.distanceToDestinationMeters,
+              estimatedArrivalMinutes: payload.tempoEstimadoMin ?? d.estimatedArrivalMinutes,
+              lastGpsUpdateAt: new Date().toISOString(),
+            };
+          })
+        );
+      })
       .subscribe();
 
     return () => {
@@ -1153,18 +1176,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     'concluida',
   ];
 
-  const avancarStatusEntrega = (deliveryId: string, actorName?: string, pinInput?: string) => {
+  const avancarStatusEntrega = (
+    deliveryId: string,
+    actorName?: string,
+    pinInput?: string,
+    targetStatus?: DeliveryStatus
+  ) => {
     const delivery = deliveries.find((d) => d.id === deliveryId);
     if (!delivery) return { success: false, error: 'Entrega não encontrada.' };
     if (delivery.status === 'concluida') return { success: false, error: 'Esta entrega já foi concluída.' };
     if (delivery.status === 'cancelada') return { success: false, error: 'Esta entrega está cancelada.' };
 
     const currentIndex = statusPipeline.indexOf(delivery.status);
-    if (currentIndex === -1 || currentIndex >= statusPipeline.length - 1) {
-      return { success: false, error: 'Não é possível avançar mais o status desta entrega.' };
-    }
+    let nextStatus: DeliveryStatus;
 
-    const nextStatus = statusPipeline[currentIndex + 1];
+    if (targetStatus) {
+      nextStatus = targetStatus;
+    } else {
+      if (currentIndex === -1 || currentIndex >= statusPipeline.length - 1) {
+        return { success: false, error: 'Não é possível avançar mais o status desta entrega.' };
+      }
+      nextStatus = statusPipeline[currentIndex + 1];
+    }
     const now = new Date().toISOString();
     const actor = actorName || delivery.courierName || session.adminName || 'Central';
 
@@ -1271,6 +1304,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.warn('Sync status Supabase:', err);
     }
+
+    playChime();
+    return { success: true };
+  };
+
+  // Notificação imediata de chegada do mototaxista ao local de embarque (automático via GPS ou manual)
+  const notificarChegadaPiloto = (deliveryId: string) => {
+    const delivery = deliveries.find((d) => d.id === deliveryId);
+    if (!delivery) return { success: false, error: 'Viagem não encontrada.' };
+
+    const now = new Date().toISOString();
+    setDeliveries((prev) =>
+      prev.map((d) => {
+        if (d.id !== deliveryId) return d;
+        const jaNotificado = d.statusHistory?.some((h) => h.note?.includes('chegou ao local de embarque'));
+        if (jaNotificado) return d;
+
+        return {
+          ...d,
+          statusHistory: [
+            ...d.statusHistory,
+            {
+              status: d.status,
+              timestamp: now,
+              actorName: d.courierName || 'Piloto',
+              note: '🎯 Piloto chegou ao local de embarque! Notificação enviada ao passageiro.',
+            },
+          ],
+        };
+      })
+    );
+
+    // Envia mensagem instantânea no chat para alertar o passageiro
+    enviarMensagemChat(
+      deliveryId,
+      '👋 Cheguei ao local de embarque! Estou na moto aguardando você.',
+      delivery.courierId || 'piloto',
+      'mototaxista',
+      delivery.courierName || 'Piloto de Moto'
+    );
 
     playChime();
     return { success: true };
@@ -1554,6 +1627,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       })
     );
+
+    // Transmissão via Realtime Broadcast Efêmero (Custo Zero no Banco)
+    try {
+      const supabase = getSupabase();
+      if (supabase && telemetria.courierLat && telemetria.courierLng) {
+        supabase.channel('nexo-realtime-canal').send({
+          type: 'broadcast',
+          event: 'telemetria_gps',
+          payload: {
+            deliveryId,
+            courierLat: telemetria.courierLat,
+            courierLng: telemetria.courierLng,
+            heading: telemetria.heading,
+            speed: telemetria.speed,
+          },
+        });
+      }
+    } catch {}
 
     // Persistência inteligente do GPS a cada 15s no Supabase
     throttleAction(`gps_sync_${deliveryId}`, 14000, () => {
@@ -2759,6 +2850,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         atualizarTelemetriaGps,
         aceitarEntrega,
         avancarStatusEntrega,
+        notificarChegadaPiloto,
         confirmarRetornoDinheiroEntregador,
         confirmarRecebimentoDinheiroComercio,
         cancelarEntrega,

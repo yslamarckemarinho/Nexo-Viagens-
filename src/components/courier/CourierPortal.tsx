@@ -5,6 +5,7 @@ import { getZoneBadgeDetails } from '../../utils/routeIntelligence';
 import { generateMapsNavigationUrl, generateWazeNavigationUrl, cleanWhatsAppNumber } from '../../utils/whatsapp';
 import {
   Car,
+  Bike,
   Power,
   CheckCircle,
   Clock,
@@ -48,6 +49,9 @@ import {
 } from 'lucide-react';
 import { RideChatModal } from '../common/RideChatModal';
 import { RideSosModal } from '../common/RideSosModal';
+import { RouteNavigationMap } from './RouteNavigationMap';
+import { GpsPermissionModal } from '../common/GpsPermissionModal';
+import { PWAInstallBanner } from '../common/PWAInstallBanner';
 import {
   solicitarPermissaoNotificacao,
   enviarNotificacaoWeb,
@@ -64,6 +68,7 @@ export const CourierPortal: React.FC = () => {
     pracas,
     aceitarEntrega,
     avancarStatusEntrega,
+    notificarChegadaPiloto,
     atualizarTelemetriaGps,
     confirmarRetornoDinheiroEntregador,
     solicitarSaque,
@@ -539,6 +544,20 @@ export const CourierPortal: React.FC = () => {
 
       {/* Main Container */}
       <main className="max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-5">
+        {/* Modal Amigável de Permissão GPS para o Piloto */}
+        <GpsPermissionModal
+          tipoUsuario="mototaxista"
+          onPermitido={(coords) => {
+            const result = detectarPracaMaisProxima(coords.lat, coords.lng, pracas, 450);
+            if (result.dentroDePraca && result.pracaDetectada) {
+              atualizarPracaMototaxista(currentCourier.id, result.pracaDetectada.id);
+            }
+          }}
+        />
+
+        {/* Banner de Instalação do App PWA */}
+        <PWAInstallBanner />
+
         {/* COMUNICADOS / BROADCAST DA CENTRAL NEXO */}
         {broadcastAlerts && broadcastAlerts.filter(a => a.ativo && (a.publico_alvo === 'todos' || a.publico_alvo === 'motoristas')).map(alert => (
           <div
@@ -834,6 +853,37 @@ export const CourierPortal: React.FC = () => {
                   </div>
                 </div>
 
+                {/* 🗺️ SUGESTÃO C HÍBRIDA: MINI-MAPA COM O GUIA AZUL & NAVEGAÇÃO POR VOZ DE 1 TOQUE */}
+                <RouteNavigationMap
+                  delivery={myActiveDelivery}
+                  courierLat={myActiveDelivery.currentCourierLat}
+                  courierLng={myActiveDelivery.currentCourierLng}
+                  courierHeading={myActiveDelivery.currentCourierHeading}
+                  courierSpeed={myActiveDelivery.currentCourierSpeed}
+                  highContrastMode={highContrastMode}
+                  onChegouEmbarque={() => {
+                    notificarChegadaPiloto(myActiveDelivery.id);
+                  }}
+                  onChegouDestino={() => {
+                    setPinInput('');
+                    setPinError(null);
+                    setShowPinModal(true);
+                  }}
+                  onIniciarViagem={() => {
+                    avancarStatusEntrega(
+                      myActiveDelivery.id,
+                      currentCourier.name,
+                      undefined,
+                      'a_caminho_entrega'
+                    );
+                  }}
+                  onAbrirPinModal={() => {
+                    setPinInput('');
+                    setPinError(null);
+                    setShowPinModal(true);
+                  }}
+                />
+
                 {/* Origem & Destino da Viagem */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   {/* Item Description se houver */}
@@ -1026,46 +1076,71 @@ export const CourierPortal: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Botão de Ação para Avançar Etapa com Suporte ao PIN */}
-                <div className="pt-2">
+                {/* Botão de Ação Direta Simplificado para o Piloto */}
+                <div className="pt-2 space-y-2">
                   {(() => {
                     const isFinishingStep = myActiveDelivery.status === 'a_caminho_entrega';
-                    const action = getNextActionLabel(myActiveDelivery.status, myActiveDelivery.serviceCategory);
                     const isPassageiro = myActiveDelivery.serviceCategory === 'passageiro';
-                    return (
-                      <button
-                        id="btn-advance-active-delivery"
-                        onClick={() => {
-                          if (isFinishingStep) {
+
+                    if (isFinishingStep) {
+                      return (
+                        <button
+                          id="btn-advance-active-delivery"
+                          onClick={() => {
                             setPinInput('');
                             setPinError(null);
                             setShowPinModal(true);
-                          } else {
-                            avancarStatusEntrega(myActiveDelivery.id, 'courier');
-                          }
-                        }}
-                        className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all transform active:scale-98 ${
-                          isFinishingStep
-                            ? 'bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950'
-                            : action.color
-                        }`}
-                      >
-                        {isFinishingStep ? (
-                          <>
-                            <Key className="w-4 h-4" />
-                            <span>
-                              {isPassageiro
-                                ? 'Desembarcar Passageiro (Digitar PIN / U-Código)'
-                                : 'Entregar ao Destinatário (Digitar PIN)'}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span>{action.label}</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
+                          }}
+                          className="w-full py-4 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:from-emerald-400 hover:to-cyan-300 text-slate-950 cursor-pointer transition-all transform active:scale-98"
+                        >
+                          <Key className="w-5 h-5" />
+                          <span>
+                            {isPassageiro
+                              ? 'Cheguei ao Destino • Concluir Desembarque (Digitar PIN)'
+                              : 'Cheguei • Entregar Encomenda (Digitar PIN)'}
+                          </span>
+                        </button>
+                      );
+                    }
+
+                    // Se ainda está a caminho do embarque / coleta
+                    return (
+                      <div className="space-y-2">
+                        <button
+                          id="btn-advance-active-delivery"
+                          onClick={() => {
+                            avancarStatusEntrega(
+                              myActiveDelivery.id,
+                              currentCourier.name,
+                              undefined,
+                              'a_caminho_entrega'
+                            );
+                          }}
+                          className="w-full py-4 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 cursor-pointer transition-all transform active:scale-98"
+                        >
+                          <Bike className="w-5 h-5" />
+                          <span>
+                            {isPassageiro
+                              ? 'Passageiro Embarcou • Iniciar Viagem ao Destino'
+                              : 'Item Coletado • Iniciar Rota ao Destino'}
+                          </span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+
+                        <div className="flex items-center justify-between text-xs px-1">
+                          <button
+                            type="button"
+                            onClick={() => notificarChegadaPiloto(myActiveDelivery.id)}
+                            className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1.5 cursor-pointer underline text-[11px]"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Avisar Passageiro: "Estou no Portão / Cheguei"</span>
+                          </button>
+                          <span className="text-[10px] text-slate-400">
+                            (GPS detecta chegada automaticamente ao se aproximar)
+                          </span>
+                        </div>
+                      </div>
                     );
                   })()}
                 </div>

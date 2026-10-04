@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { NexoLogo } from './NexoLogo';
+import { PWAInstallBanner } from './PWAInstallBanner';
 import {
   Car,
   ShieldCheck,
@@ -83,6 +84,9 @@ export const Header: React.FC = () => {
 
         {/* User Identity & Actions */}
         <div className="flex items-center gap-2 sm:gap-4">
+          {/* Botão de Download / Instalação PWA */}
+          <PWAInstallBanner compact={true} />
+
           {/* Admin Role Identity */}
           {session.role === 'admin' && (
             <div className="flex items-center gap-2 bg-slate-800/90 border border-cyan-500/30 rounded-2xl px-3 py-1.5">
