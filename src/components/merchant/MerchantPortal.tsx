@@ -197,6 +197,7 @@ export const MerchantPortal: React.FC = () => {
 
   // Recharge modal states
   const [rechargeAmount, setRechargeAmount] = useState<number>(30);
+  const [rechargeStep, setRechargeStep] = useState<'valor' | 'pagamento' | 'confirmando'>('valor');
   const [rechargeSuccessMsg, setRechargeSuccessMsg] = useState<string | null>(null);
   const [copiedPixKey, setCopiedPixKey] = useState(false);
   const [copiedPixCode, setCopiedPixCode] = useState(false);
@@ -649,15 +650,11 @@ export const MerchantPortal: React.FC = () => {
 
                 <div className="max-w-2xl space-y-6">
                   <div className="space-y-1">
-                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Experiência Instantânea Uber em Alagoinha
-                    </span>
                     <h2 className="text-2xl sm:text-3xl font-black text-white">
                       Para onde vamos hoje?
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-400">
-                      Chame um mototaxista credenciado em segundos com tarifa fixa e pagamento automático por créditos.
+                      Mototaxi credenciado em segundos com preço fixo pelo sistema.
                     </p>
                   </div>
 
@@ -1606,78 +1603,42 @@ export const MerchantPortal: React.FC = () => {
               )}
             </div>
 
-            {/* FORMA DE PAGAMENTO EXCLUSIVA: 100% CRÉDITOS PRÉ-PAGOS DA CENTRAL */}
-            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+            {/* FORMA DE PAGAMENTO LIMPA: CRÉDITOS NEXO VIAGENS */}
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
-                    <CreditCard className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-white block">
-                      Pagamento Exclusivo via Créditos Nexo Viagens
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">
-                      A Central arrecada antecipadamente e repassa diretamente ao motorista parceiro
-                    </span>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-md bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-mono text-[10px] font-bold">
-                  100% Digital
+                <span className="text-xs font-bold text-slate-300">Pagamento: Saldo de Créditos Nexo</span>
+                <span className={`text-xs font-black ${currentMerchant.creditBalance < deliveryFee ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  Seu Saldo: R$ {currentMerchant.creditBalance.toFixed(2)}
                 </span>
-              </div>
-
-              {/* Saldo vs Custo */}
-              <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800/80 text-center">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Seu Saldo Atual</span>
-                  <span className={`text-xs font-black ${currentMerchant.creditBalance < deliveryFee ? 'text-rose-400' : 'text-emerald-400'}`}>
-                    R$ {currentMerchant.creditBalance.toFixed(2)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Custo da Viagem</span>
-                  <span className="text-xs font-black text-cyan-300">
-                    R$ {deliveryFee.toFixed(2)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Saldo Restante</span>
-                  <span className={`text-xs font-black ${currentMerchant.creditBalance - deliveryFee < 0 ? 'text-rose-400' : 'text-slate-300'}`}>
-                    R$ {Math.max(0, currentMerchant.creditBalance - deliveryFee).toFixed(2)}
-                  </span>
-                </div>
               </div>
 
               {/* Alerta de Saldo Insuficiente ou Confirmação */}
               {currentMerchant.creditBalance < deliveryFee ? (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs space-y-2.5">
-                  <div className="flex items-start gap-2 text-rose-300">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-                    <div>
-                      <span className="font-bold block">Saldo Insuficiente de Créditos</span>
-                      <p className="text-[11px] text-rose-200 mt-0.5">
-                        Faltam R$ {(deliveryFee - currentMerchant.creditBalance).toFixed(2)} para solicitar esta viagem. A Nexo Viagens opera 100% via créditos pré-pagos arrecadados pela Central para garantir o repasse aos motoristas.
-                      </p>
-                    </div>
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs flex items-center justify-between gap-3">
+                  <div>
+                    <span className="font-bold text-rose-300 block">Saldo Insuficiente</span>
+                    <span className="text-[11px] text-rose-200">
+                      Faltam R$ {(deliveryFee - currentMerchant.creditBalance).toFixed(2)} para esta corrida.
+                    </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
                       setShowNewRideModal(false);
+                      setRechargeAmount(Math.ceil(deliveryFee - currentMerchant.creditBalance));
+                      setRechargeStep('pagamento');
                       setShowRechargeModal(true);
                     }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+                    className="py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shrink-0 cursor-pointer shadow-md"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Recarregar Créditos via Pix Agora</span>
+                    + Pagar Pix (R$ {Math.ceil(deliveryFee - currentMerchant.creditBalance).toFixed(2)})
                   </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-300">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>
-                    Saldo suficiente! O valor de R$ {deliveryFee.toFixed(2)} será debitado do seu saldo e repassado pela Central ao motorista parceiro.
+                    Saldo suficiente! O valor de R$ {deliveryFee.toFixed(2)} será debitado e repassado pela Central.
                   </span>
                 </div>
               )}
@@ -1743,116 +1704,217 @@ export const MerchantPortal: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: RECARGA DE CRÉDITOS VIA PIX */}
+      {/* MODAL: RECARGA DE CRÉDITOS VIA PIX (DESIGN MINIMALISTA COM PROGRESSO EM 3 ETAPAS) */}
       {showRechargeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4">
+            {/* Header Limpo */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-cyan-400" />
-                <h3 className="font-bold text-white text-base">Recarregar Créditos via Pix</h3>
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Adicionar Saldo Pix</h3>
+                  <span className="text-[10px] text-slate-400">Liberação rápida para suas viagens</span>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowRechargeModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800"
+                onClick={() => {
+                  setShowRechargeModal(false);
+                  setRechargeStep('valor');
+                  setRechargeSuccessMsg(null);
+                }}
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl bg-slate-800 transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            {rechargeSuccessMsg ? (
-              <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs text-center space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
-                <p className="font-bold">{rechargeSuccessMsg}</p>
+            {/* Barra de Progresso Minimalista de 3 Etapas */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-950 text-center text-[10px] font-bold">
+              <div className={`py-1 rounded-lg ${rechargeStep === 'valor' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400'}`}>
+                1. Valor
               </div>
-            ) : (
-              <form onSubmit={handleRechargeSubmit} className="space-y-4 text-xs">
-                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                  <div>
-                    <span className="text-slate-400 block font-semibold mb-1">Chave Pix da Central:</span>
-                    <div className="flex items-center justify-between bg-slate-900 p-2.5 rounded-xl border border-slate-800 font-mono text-cyan-300">
-                      <span className="truncate">{settings.centralPixKey}</span>
-                      <button
-                        type="button"
-                        onClick={handleCopyPix}
-                        className="ml-2 text-xs font-bold text-white hover:text-cyan-400 flex items-center gap-1 cursor-pointer"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>{copiedPixKey ? 'Copiado!' : 'Copiar'}</span>
-                      </button>
-                    </div>
-                  </div>
+              <div className={`py-1 rounded-lg ${rechargeStep === 'pagamento' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400'}`}>
+                2. Pagar Pix
+              </div>
+              <div className={`py-1 rounded-lg ${rechargeStep === 'confirmando' ? 'bg-emerald-400 text-slate-950 animate-pulse' : 'text-slate-400'}`}>
+                3. Liberado
+              </div>
+            </div>
 
-                  {/* Sugestão 4: PIX Copia e Cola Automático */}
-                  <div>
-                    <span className="text-slate-400 block font-semibold mb-1">Pix Copia e Cola (Qualquer Banco):</span>
-                    <div className="flex items-center justify-between bg-slate-900 p-2.5 rounded-xl border border-slate-800 font-mono text-emerald-300 text-[11px]">
-                      <span className="truncate max-w-[240px]">{generatedPixCode}</span>
-                      <button
-                        type="button"
-                        onClick={handleCopyPixCode}
-                        className="ml-2 text-xs font-bold text-white hover:text-emerald-400 flex items-center gap-1 cursor-pointer"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>{copiedPixCode ? 'Copiado!' : 'Copiar'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-slate-500">Beneficiário: Central Nexo Alagoinha</p>
-                </div>
-
+            {/* ETAPA 1: Escolha Rápida do Valor */}
+            {rechargeStep === 'valor' && (
+              <div className="space-y-4 pt-1">
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1.5">
-                    Valor da Recarga (R$) *
-                  </label>
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    {[20, 30, 50].map((amt) => (
+                  <span className="text-xs font-semibold text-slate-300 block mb-2">Quanto você quer recarregar?</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[10, 20, 30].map((amt) => (
                       <button
                         key={amt}
                         type="button"
                         onClick={() => setRechargeAmount(amt)}
-                        className={`py-2 rounded-xl font-bold border cursor-pointer ${
+                        className={`py-3 rounded-2xl font-black text-sm border transition-all cursor-pointer ${
                           rechargeAmount === amt
-                            ? 'bg-cyan-500 text-slate-950 border-cyan-400'
-                            : 'bg-slate-950 border-slate-800 text-slate-300'
+                            ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md shadow-cyan-500/20'
+                            : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
                         }`}
                       >
                         R$ {amt},00
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Ou digite outro valor (R$):
+                  </label>
                   <input
                     type="number"
-                    min="5"
+                    min="4"
                     step="1"
                     value={rechargeAmount}
                     onChange={(e) => setRechargeAmount(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold text-sm focus:outline-none focus:border-cyan-400"
-                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-black text-base focus:outline-none focus:border-cyan-400"
+                    placeholder="Ex: 15"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  {/* Sugestão 4: Validação Instantânea de Pix */}
+                <button
+                  type="button"
+                  onClick={() => setRechargeStep('pagamento')}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
+                >
+                  <span>Avançar para o Pix de R$ {rechargeAmount.toFixed(2)}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* ETAPA 2: Pagamento do Pix (Copia e Cola + Chave) */}
+            {rechargeStep === 'pagamento' && (
+              <div className="space-y-3 pt-1 text-xs">
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5 text-center">
+                  <span className="text-[11px] text-slate-400 block font-semibold">Valor exato a pagar:</span>
+                  <span className="text-2xl font-black text-cyan-400 block">
+                    R$ {rechargeAmount.toFixed(2)}
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">Favorecido: Central Nexo Viagens Alagoinha</span>
+                </div>
+
+                {/* Botão de Copiar Pix Copia e Cola */}
+                <button
+                  type="button"
+                  onClick={handleCopyPixCode}
+                  className="w-full py-3 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer transition-all"
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>{copiedPixCode ? '✓ Pix Copiado! Cole no seu Banco' : 'Copiar Código Pix (Qualquer Banco)'}</span>
+                </button>
+
+                {/* Opção Secundária: Chave Simples */}
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400 truncate">Chave: <strong className="text-white font-mono">{settings.centralPixKey}</strong></span>
                   <button
                     type="button"
-                    onClick={handleInstantWebhookPix}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer"
+                    onClick={handleCopyPix}
+                    className="text-cyan-400 font-bold hover:underline shrink-0 ml-2"
                   >
-                    <Zap className="w-4 h-4 text-slate-950" />
-                    <span>⚡ Confirmar Pix Instantâneo (Automático)</span>
+                    {copiedPixKey ? 'Copiada!' : 'Copiar Chave'}
+                  </button>
+                </div>
+
+                {/* Ações após pagar */}
+                <div className="space-y-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRechargeStep('confirmando');
+                      // Transmite para a Central avisando que o passageiro pagou
+                      try {
+                        const supabase = getSupabase();
+                        if (supabase) {
+                          supabase.channel('nexo-realtime-canal').send({
+                            type: 'broadcast',
+                            event: 'novo_pix_solicitado',
+                            payload: {
+                              merchantId: currentMerchant.id,
+                              merchantName: currentMerchant.name,
+                              amountRequested: rechargeAmount,
+                            },
+                          });
+                        }
+                      } catch {}
+                    }}
+                    className="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Já Paguei, Conferir Saldo</span>
                   </button>
 
                   <button
-                    type="submit"
-                    className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold border border-slate-700 cursor-pointer"
+                    type="button"
+                    onClick={() => setRechargeStep('valor')}
+                    className="w-full py-2 text-slate-400 hover:text-white text-[11px] text-center"
                   >
-                    Registrar Comprovante Manualmente
+                    ← Alterar valor
                   </button>
                 </div>
-              </form>
+              </div>
+            )}
+
+            {/* ETAPA 3: Confirmação com Cronômetro e Botão WhatsApp sem Trava */}
+            {rechargeStep === 'confirmando' && (
+              <div className="space-y-3.5 py-2 text-center text-xs">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto border border-cyan-500/40 animate-pulse">
+                  <Clock className="w-6 h-6" />
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="font-black text-white text-base">Avisando a Central Nexo...</h4>
+                  <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                    A Central já recebeu a notificação do seu Pix de <strong>R$ {rechargeAmount.toFixed(2)}</strong>. O tempo médio de liberação é de 30 a 60 segundos.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                  <span className="text-[11px] text-slate-300 block font-semibold">
+                    Quer liberar ainda mais rápido?
+                  </span>
+                  <a
+                    href={`https://wa.me/55${cleanWhatsAppNumber(settings.centralPhone)}?text=${encodeURIComponent(`Olá Central Nexo! Acabei de enviar o Pix de R$ ${rechargeAmount.toFixed(2)} no app para o passageiro ${currentMerchant.name}.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-black text-xs flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4 text-emerald-400" />
+                    <span>Avisar no WhatsApp da Central</span>
+                  </a>
+                </div>
+
+                {/* Botão de Auto-Confirmação Rápida caso seja teste/API */}
+                <button
+                  type="button"
+                  onClick={handleInstantWebhookPix}
+                  className="text-[11px] text-cyan-400 hover:underline block mx-auto font-medium"
+                >
+                  ⚡ Validar Instantaneamente (Simular Banco Webhook)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRechargeModal(false);
+                    setRechargeStep('valor');
+                  }}
+                  className="w-full py-2 text-slate-400 hover:text-white text-[11px]"
+                >
+                  Fechar janela (Você pode continuar usando o app)
+                </button>
+              </div>
             )}
           </div>
         </div>

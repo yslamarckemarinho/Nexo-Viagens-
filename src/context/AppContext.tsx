@@ -50,7 +50,15 @@ interface AppContextType {
   loginCourier: (identifier: string, password?: string) => { success: boolean; error?: string; courier?: Courier };
   cadastrarComercio: (data: MerchantRegisterInput) => { success: boolean; error?: string; merchant?: Merchant };
   cadastrarEntregador: (data: CourierRegisterInput) => { success: boolean; error?: string; courier?: Courier };
+  // Torre de Controle: Simulação e Acesso Direto com 1 Toque
+  entrarComoPassageiro: (merchantId: string) => void;
+  entrarComoPiloto: (courierId: string) => void;
+  voltarParaCentral: () => void;
   logout: () => void;
+
+  // Notificação Toast ao Vivo da Torre de Controle
+  liveNotification: { id: string; tipo: 'passageiro' | 'piloto' | 'pix' | 'corrida'; titulo: string; mensagem: string; timestamp: number } | null;
+  limparLiveNotification: () => void;
 
   // Active Entities
   currentMerchant: Merchant | undefined;
@@ -337,6 +345,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isSupabaseActive, setIsSupabaseActive] = useState<boolean>(() => isSupabaseConfigured());
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [liveNotification, setLiveNotification] = useState<{
+    id: string;
+    tipo: 'passageiro' | 'piloto' | 'pix' | 'corrida';
+    titulo: string;
+    mensagem: string;
+    timestamp: number;
+  } | null>(null);
+
+  const limparLiveNotification = () => setLiveNotification(null);
 
   // Sync state to localStorage
   useEffect(() => {
@@ -595,7 +612,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       )
-      // 📡 Sincronização Broadcast em Tempo Real entre Aparelhos (Novo Passageiro / Novo Piloto)
+      // 📡 Sincronização Broadcast em Tempo Real entre Aparelhos (Novo Passageiro / Novo Piloto / Novo Pix)
       .on('broadcast', { event: 'novo_cadastro_passageiro' }, ({ payload }) => {
         if (!payload || !payload.id) return;
         setMerchants((prev) => {
@@ -603,6 +620,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return prev.map((m) => (m.id === payload.id ? { ...m, ...payload } : m));
           }
           return [payload, ...prev];
+        });
+        setLiveNotification({
+          id: `notif-${Date.now()}`,
+          tipo: 'passageiro',
+          titulo: '🎉 Novo Passageiro na Área!',
+          mensagem: `${payload.name || 'Passageiro'} (${payload.phone || 'Sem fone'}) acabou de se cadastrar.`,
+          timestamp: Date.now(),
         });
         playChime();
       })
@@ -614,6 +638,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           return [payload, ...prev];
         });
+        setLiveNotification({
+          id: `notif-${Date.now()}`,
+          tipo: 'piloto',
+          titulo: '🏍️ Novo Piloto de Moto!',
+          mensagem: `${payload.name || 'Piloto'} (${payload.phone || ''}) aguarda liberação da Central.`,
+          timestamp: Date.now(),
+        });
+        playChime();
+      })
+      .on('broadcast', { event: 'novo_pix_solicitado' }, ({ payload }) => {
+        if (!payload) return;
+        setLiveNotification({
+          id: `notif-${Date.now()}`,
+          tipo: 'pix',
+          titulo: '💳 Pix Recebido para Conferência',
+          mensagem: `${payload.merchantName || 'Passageiro'} enviou R$ ${Number(payload.amountRequested || 0).toFixed(2)}.`,
+          timestamp: Date.now(),
+        });
+        playChime();
+      })
+      .on('broadcast', { event: 'pix_confirmado' }, ({ payload }) => {
+        if (!payload || !payload.merchantId) return;
+        setMerchants((prev) =>
+          prev.map((m) =>
+            m.id === payload.merchantId
+              ? { ...m, creditBalance: payload.newBalance }
+              : m
+          )
+        );
+        setRecharges((prev) =>
+          prev.map((r) =>
+            r.id === payload.rechargeId
+              ? { ...r, status: 'confirmado', newBalance: payload.newBalance }
+              : r
+          )
+        );
         playChime();
       })
       // 📡 CANAL EFÊMERO P2P (BROADCAST): Sincroniza GPS do piloto com o passageiro em tempo real sem gravar no banco
@@ -1016,6 +1076,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     playChime();
     return { success: true, courier: newCourier };
+  };
+
+  // TORRE DE CONTROLE: ACESSO DIRETO COM 1 TOQUE (SIMULAÇÃO / AUDITORIA DE USUÁRIO)
+  const entrarComoPassageiro = (merchantId?: string) => {
+    let target = merchantId ? merchants.find((m) => m.id === merchantId) : merchants[0];
+    if (!target) {
+      const demo: Merchant = {
+        id: `merch-${Date.now()}`,
+        name: 'Passageiro Alagoinha (Teste)',
+        ownerName: 'Passageiro Teste',
+        phone: '(83) 98822-0001',
+        address: 'Centro, Alagoinha-PB',
+        active: true,
+        status_cadastro: 'confirmado',
+        creditBalance: 25.0,
+        totalSpent: 0,
+        totalDeliveries: 0,
+        createdAt: new Date().toISOString(),
+      };
+      setMerchants((prev) => [demo, ...prev]);
+      target = demo;
+    }
+    setSession({
+      role: 'merchant',
+      portalView: 'merchant',
+      merchantId: target.id,
+      adminOriginalSession: true,
+      isAuthenticated: true,
+    });
+    playChime();
+  };
+
+  const entrarComoPiloto = (courierId?: string) => {
+    let target = courierId ? couriers.find((c) => c.id === courierId) : couriers[0];
+    if (!target) {
+      const demoCourier: Courier = {
+        id: `cour-${Date.now()}`,
+        name: 'Mototaxista Credenciado (Piloto 01)',
+        phone: '(83) 99911-0001',
+        cpf: '000.000.000-01',
+        vehicleType: 'moto',
+        vehiclePlate: 'NEX-2026',
+        pixKey: '83999110001',
+        pixKeyType: 'telefone',
+        active: true,
+        isOnline: true,
+        approvalStatus: 'aprovado',
+        isApproved: true,
+        assignedZoneId: 'praca_1_centro',
+        accumulatedBalance: 40.0,
+        totalGrossEarned: 150.0,
+        totalNetPaid: 100.0,
+        completedDeliveries: 12,
+        totalWithdrawalsCount: 0,
+        createdAt: new Date().toISOString(),
+      };
+      setCouriers((prev) => [demoCourier, ...prev]);
+      target = demoCourier;
+    }
+    setSession({
+      role: 'courier',
+      portalView: 'courier',
+      courierId: target.id,
+      adminOriginalSession: true,
+      isAuthenticated: true,
+    });
+    playChime();
+  };
+
+  const voltarParaCentral = () => {
+    setSession({
+      role: 'admin',
+      portalView: 'admin',
+      adminName: 'Administrador Nexo (Central)',
+      isAuthenticated: true,
+    });
+    playChime();
   };
 
   // LOGOUT (Guarantees clean state, no cross-account data leakage)
@@ -1941,7 +2078,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const confirmarRecargaPix = (rechargeId: string, pixRef?: string) => {
     const recharge = recharges.find((r) => r.id === rechargeId);
     if (!recharge) return { success: false, error: 'Recarga não encontrada.' };
-    if (recharge.status !== 'aguardando_pix') {
+    if (recharge.status !== 'aguardando_pix' && recharge.status !== 'pendente') {
       return { success: false, error: 'Esta solicitação de recarga já foi processada.' };
     }
 
@@ -1979,6 +2116,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : r
       )
     );
+
+    // Broadcast instantâneo para desbloquear imediatamente a tela do passageiro
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        supabase.channel('nexo-realtime-canal').send({
+          type: 'broadcast',
+          event: 'pix_confirmado',
+          payload: {
+            rechargeId,
+            merchantId: merchant.id,
+            newBalance: newBal,
+          },
+        });
+      }
+    } catch {}
 
     logAudit({
       category: 'credito',
@@ -3071,7 +3224,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginCourier,
         cadastrarComercio,
         cadastrarEntregador,
+        entrarComoPassageiro,
+        entrarComoPiloto,
+        voltarParaCentral,
         logout,
+        liveNotification,
+        limparLiveNotification,
         currentMerchant,
         currentCourier,
         settings,

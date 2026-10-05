@@ -18,6 +18,7 @@ import {
 export const Header: React.FC = () => {
   const {
     session,
+    voltarParaCentral,
     logout,
     currentMerchant,
     currentCourier,
@@ -156,6 +157,18 @@ export const Header: React.FC = () => {
                 <span className="hidden sm:inline">{currentCourier.isOnline ? 'Online' : 'Offline'}</span>
               </button>
             </div>
+          )}
+
+          {/* Botão de Retorno Rápido para a Central (Modo Simulação do Admin) */}
+          {session.adminOriginalSession && (
+            <button
+              onClick={voltarParaCentral}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-md shadow-amber-500/20 transition-all cursor-pointer animate-pulse"
+              title="Voltar instantaneamente ao painel Central Nexo"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Voltar à Central</span>
+            </button>
           )}
 
           {/* Sair / Encerrar Sessão Button */}

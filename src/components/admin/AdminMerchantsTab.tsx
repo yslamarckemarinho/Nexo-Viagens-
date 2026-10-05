@@ -18,6 +18,7 @@ import {
   User,
   ShieldAlert,
   Clock,
+  Eye,
 } from 'lucide-react';
 
 export const AdminMerchantsTab: React.FC = () => {
@@ -28,6 +29,7 @@ export const AdminMerchantsTab: React.FC = () => {
     toggleComercioStatus,
     ajustarCreditoManual,
     confirmarPassageiro,
+    entrarComoPassageiro,
     settings,
   } = useApp();
 
@@ -348,6 +350,16 @@ Qualquer dúvida, estamos à disposição na Central Nexo Viagens!`;
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => entrarComoPassageiro(merchant.id)}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-md shadow-cyan-500/20 transition-all cursor-pointer"
+                  title="Entrar imediatamente no app como este passageiro para testar ou pedir por ele"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Entrar no App</span>
+                </button>
+
                 <a
                   href={getWhatsAppAccessUrl(merchant)}
                   target="_blank"
@@ -356,7 +368,7 @@ Qualquer dúvida, estamos à disposição na Central Nexo Viagens!`;
                   title="Enviar link de login e senha no WhatsApp do passageiro"
                 >
                   <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Enviar Acesso</span>
+                  <span>WhatsApp</span>
                 </a>
 
                 <button

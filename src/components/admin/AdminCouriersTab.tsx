@@ -26,6 +26,7 @@ import {
   MapPin,
   AlertTriangle,
   Sparkles,
+  Eye,
 } from 'lucide-react';
 
 const DEFAULT_AVATARS = [
@@ -44,6 +45,7 @@ export const AdminCouriersTab: React.FC = () => {
     toggleEntregadorStatus,
     toggleEntregadorOnline,
     autorizarPiloto,
+    entrarComoPiloto,
     settings,
   } = useApp();
 
@@ -492,6 +494,16 @@ ${isPending ? '⏳ Assim que autorizado, você poderá ficar Online para aceitar
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => entrarComoPiloto(courier.id)}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+                    title="Entrar imediatamente no app como este motorista para simular corridas"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Entrar no App</span>
+                  </button>
+
                   <a
                     href={getWhatsAppAccessUrl(courier)}
                     target="_blank"

@@ -415,7 +415,7 @@ export interface CentralSettings extends ConfiguracoesCentral {
 
 export type PixKeyType = 'cpf' | 'cnpj' | 'telefone' | 'email' | 'aleatoria';
 
-export type RechargeStatus = 'aguardando_pix' | 'confirmado' | 'rejeitado';
+export type RechargeStatus = 'aguardando_pix' | 'pendente' | 'confirmado' | 'rejeitado';
 
 export interface CreditRecharge {
   id: string;
@@ -488,6 +488,7 @@ export interface UserSession {
   merchantId?: string; // ID do Passageiro
   courierId?: string;  // ID do Mototaxista
   adminName?: string;
+  adminOriginalSession?: boolean; // Indica que o Administrador está simulando/acessando como o usuário
   isAuthenticated: boolean;
 }
 

@@ -41,7 +41,19 @@ type AdminTab =
   | 'configuracoes';
 
 export const AdminPortal: React.FC = () => {
-  const { logout, merchants, recharges, withdrawals, deliveries, couriers, pracas, settings, toggleTarifaDinamica } = useApp();
+  const {
+    logout,
+    merchants,
+    recharges,
+    withdrawals,
+    deliveries,
+    couriers,
+    pracas,
+    settings,
+    toggleTarifaDinamica,
+    liveNotification,
+    limparLiveNotification,
+  } = useApp();
   const [currentTab, setCurrentTab] = useState<AdminTab>('dashboard');
 
   const pendingRechargesCount = recharges.filter((r) => r.status === 'pendente').length;
@@ -133,191 +145,203 @@ export const AdminPortal: React.FC = () => {
         </div>
       </header>
 
-      {/* Navigation Tabs Bar */}
+      {/* Alerta / Toast em Tempo Real da Torre de Controle (Novo Cadastro ou Pix) */}
+      {liveNotification && (
+        <div className="bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 text-slate-950 px-4 py-2.5 shadow-lg flex items-center justify-between gap-3 animate-slide-down sticky top-16 z-35">
+          <div className="flex items-center gap-2.5 max-w-4xl">
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-950 animate-ping shrink-0" />
+            <span className="font-black text-xs sm:text-sm">{liveNotification.titulo}:</span>
+            <span className="text-xs sm:text-sm font-semibold truncate">{liveNotification.mensagem}</span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                if (liveNotification.tipo === 'passageiro') setCurrentTab('comercios');
+                if (liveNotification.tipo === 'piloto') setCurrentTab('entregadores');
+                if (liveNotification.tipo === 'pix') setCurrentTab('creditos');
+                if (liveNotification.tipo === 'corrida') setCurrentTab('entregas');
+                limparLiveNotification();
+              }}
+              className="px-3 py-1 rounded-lg bg-slate-950 text-white font-bold text-xs hover:bg-slate-900 transition-colors cursor-pointer"
+            >
+              Ver Agora
+            </button>
+            <button
+              onClick={limparLiveNotification}
+              className="p-1 rounded-lg text-slate-950 hover:bg-black/10 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Navigation Tabs Bar - Minimalista e Focado */}
       <div className="bg-slate-900 border-b border-slate-800 sticky top-16 z-30 overflow-x-auto scrollbar-none">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1 sm:gap-2 py-2">
-          <button
-            id="tab-btn-dashboard"
-            onClick={() => setCurrentTab('dashboard')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
-              currentTab === 'dashboard'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            <span>Visão Geral</span>
-          </button>
-
-          <button
-            id="tab-btn-entregas"
-            onClick={() => setCurrentTab('entregas')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
-              currentTab === 'entregas'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Navigation className="w-4 h-4" />
-            <span>Corridas & Viagens</span>
-            {activeDeliveriesCount > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  currentTab === 'entregas' ? 'bg-slate-950 text-cyan-400' : 'bg-cyan-500 text-slate-950'
-                }`}
-              >
-                {activeDeliveriesCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            id="tab-btn-pracas"
-            onClick={() => setCurrentTab('pracas')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
-              currentTab === 'pracas'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <MapPin className="w-4 h-4" />
-            <span>Praças de Mototáxi</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                currentTab === 'pracas' ? 'bg-slate-950 text-cyan-400' : 'bg-slate-800 text-slate-300'
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-2 py-2">
+          {/* As 4 Abas Essenciais do Dia a Dia */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              id="tab-btn-dashboard"
+              onClick={() => setCurrentTab('dashboard')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
+                currentTab === 'dashboard'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
-              {pracas.length}
-            </span>
-          </button>
+              <LayoutDashboard className="w-4 h-4" />
+              <span>Visão Geral</span>
+            </button>
 
-          {/* Sugestão 10: Relatório Mensal de Demandas */}
-          <button
-            id="tab-btn-demandas"
-            onClick={() => setCurrentTab('demandas')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
-              currentTab === 'demandas'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Compass className="w-4 h-4 text-emerald-400" />
-            <span>Demanda & Zonas Rurais</span>
-          </button>
+            <button
+              id="tab-btn-entregas"
+              onClick={() => setCurrentTab('entregas')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
+                currentTab === 'entregas'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Navigation className="w-4 h-4" />
+              <span>Corridas</span>
+              {activeDeliveriesCount > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    currentTab === 'entregas' ? 'bg-slate-950 text-cyan-400' : 'bg-cyan-500 text-slate-950'
+                  }`}
+                >
+                  {activeDeliveriesCount}
+                </span>
+              )}
+            </button>
 
-          <button
-            id="tab-btn-dre"
-            onClick={() => setCurrentTab('dre')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
-              currentTab === 'dre'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+            <button
+              id="tab-btn-comercios"
+              onClick={() => setCurrentTab('comercios')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
+                currentTab === 'comercios'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <span>DRE & Fechamento</span>
-          </button>
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Passageiros</span>
+              {pendingPassengersCount > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    currentTab === 'comercios' ? 'bg-slate-950 text-cyan-400' : 'bg-cyan-400 text-slate-950'
+                  }`}
+                >
+                  {pendingPassengersCount} novo{pendingPassengersCount > 1 ? 's' : ''}
+                </span>
+              )}
+            </button>
 
-          <button
-            id="tab-btn-comercios"
-            onClick={() => setCurrentTab('comercios')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
-              currentTab === 'comercios'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Passageiros</span>
-            {pendingPassengersCount > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                  currentTab === 'comercios' ? 'bg-slate-950 text-cyan-400' : 'bg-cyan-400 text-slate-950'
-                }`}
-              >
-                {pendingPassengersCount} novo{pendingPassengersCount > 1 ? 's' : ''}
-              </span>
-            )}
-          </button>
+            <button
+              id="tab-btn-entregadores"
+              onClick={() => setCurrentTab('entregadores')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
+                currentTab === 'entregadores'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Car className="w-4 h-4" />
+              <span>Motoristas</span>
+              {pendingPilotsCount > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    currentTab === 'entregadores' ? 'bg-slate-950 text-amber-400' : 'bg-amber-400 text-slate-950'
+                  }`}
+                >
+                  {pendingPilotsCount}
+                </span>
+              )}
+            </button>
 
-          <button
-            id="tab-btn-entregadores"
-            onClick={() => setCurrentTab('entregadores')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
-              currentTab === 'entregadores'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Car className="w-4 h-4" />
-            <span>Motoristas</span>
-            {pendingPilotsCount > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                  currentTab === 'entregadores' ? 'bg-slate-950 text-amber-400' : 'bg-amber-400 text-slate-950'
-                }`}
-              >
-                {pendingPilotsCount} pendente{pendingPilotsCount > 1 ? 's' : ''}
-              </span>
-            )}
-          </button>
+            <button
+              id="tab-btn-creditos"
+              onClick={() => setCurrentTab('creditos')}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
+                currentTab === 'creditos'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Pix & Saldo</span>
+              {pendingRechargesCount > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    currentTab === 'creditos' ? 'bg-slate-950 text-cyan-400' : 'bg-amber-400 text-slate-950'
+                  }`}
+                >
+                  {pendingRechargesCount}
+                </span>
+              )}
+            </button>
+          </div>
 
-          <button
-            id="tab-btn-creditos"
-            onClick={() => setCurrentTab('creditos')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
-              currentTab === 'creditos'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            <span>Recargas Pix</span>
-            {pendingRechargesCount > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  currentTab === 'creditos' ? 'bg-slate-950 text-cyan-400' : 'bg-amber-400 text-slate-950'
-                }`}
-              >
-                {pendingRechargesCount}
-              </span>
-            )}
-          </button>
+          {/* Abas Secundárias / Financeiro e Configurações */}
+          <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
+            <button
+              id="tab-btn-saques"
+              onClick={() => setCurrentTab('saques')}
+              className={`px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+                currentTab === 'saques'
+                  ? 'bg-slate-800 text-cyan-300 border border-cyan-500/40'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+              title="Repasses dos Motoristas"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Repasses</span>
+            </button>
 
-          <button
-            id="tab-btn-saques"
-            onClick={() => setCurrentTab('saques')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer relative ${
-              currentTab === 'saques'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <DollarSign className="w-4 h-4" />
-            <span>Repasses dos Motoristas</span>
-            {pendingWithdrawalsCount > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                  currentTab === 'saques' ? 'bg-slate-950 text-cyan-400' : 'bg-amber-400 text-slate-950'
-                }`}
-              >
-                {pendingWithdrawalsCount}
-              </span>
-            )}
-          </button>
+            <button
+              id="tab-btn-pracas"
+              onClick={() => setCurrentTab('pracas')}
+              className={`px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+                currentTab === 'pracas'
+                  ? 'bg-slate-800 text-cyan-300 border border-cyan-500/40'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+              title="Praças de Mototáxi"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Praças</span>
+            </button>
 
-          <button
-            id="tab-btn-configuracoes"
-            onClick={() => setCurrentTab('configuracoes')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
-              currentTab === 'configuracoes'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            <span>Pontos & Tarifas</span>
-          </button>
+            <button
+              id="tab-btn-dre"
+              onClick={() => setCurrentTab('dre')}
+              className={`px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+                currentTab === 'dre'
+                  ? 'bg-slate-800 text-cyan-300 border border-cyan-500/40'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+              title="DRE e Fechamento Contábil"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">DRE</span>
+            </button>
+
+            <button
+              id="tab-btn-configuracoes"
+              onClick={() => setCurrentTab('configuracoes')}
+              className={`px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
+                currentTab === 'configuracoes'
+                  ? 'bg-slate-800 text-cyan-300 border border-cyan-500/40'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+              title="Tarifas e Parâmetros"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Ajustes</span>
+            </button>
+          </div>
         </div>
       </div>
 
